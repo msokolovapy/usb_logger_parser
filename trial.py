@@ -21,63 +21,64 @@ class TemperatureData():
 	Instances of this class can be compared to each other using '==' operator"""
 	def __init__(self, temperature_data):
 		self._original_data = temperature_data #list of (row_number, date_time_stamp, degrees_celsius) tuples
-		self._max = self.select_max_temperature()
-		self._min = self.select_min_temperature()
-		self._average = self.select_average_temperature()
-		self._median = self.select_median_temperature()
-		self._data_coll_freq = self.determine_ave_data_coll_frequency()
+		# self._max = self.select_max_temperature()
+		# self._min = self.select_min_temperature()
+		# self._average = self.select_average_temperature()
+		# self._median = self.select_median_temperature()
+		# self._data_coll_freq = self.determine_ave_data_coll_frequency()
+		# self._reported_data_matrix_size = (3,len(self._original_data))
 
-	def __eq__(self, other):
-		if not isinstance(other, TemperatureData):
-			raise TypeError('Wrong instance type when trying to compare temperature datasets')
-		# diff = []
-		# #use zip_longest to ensure that data sets of different lengths get zipped properly
-		# for i,data in enumerate(zip_longest(self.select_row_temperature(), other.select_row_temperature(), fillvalue = None)):
-		# 	data1, data2 = data
-		# 	if data1 != data2:
-		# 		diff.append((i+1,data1,data2)) #uses i+1 to simplify reading of the below print statement
-		# create_print_statement(diff[:100])
-		return self._data_coll_freq == other._data_coll_freq
+	# def __eq__(self, other):
+	# 	if not isinstance(other, TemperatureData):
+	# 		raise TypeError('Wrong instance type when trying to compare temperature datasets')
+	# 	# diff = []
+	# 	# #use zip_longest to ensure that data sets of different lengths get zipped properly
+	# 	# for i,data in enumerate(zip_longest(self.select_row_temperature(), other.select_row_temperature(), fillvalue = None)):
+	# 	# 	data1, data2 = data
+	# 	# 	if data1 != data2:
+	# 	# 		diff.append((i+1,data1,data2)) #uses i+1 to simplify reading of the below print statement
+	# 	# create_print_statement(diff[:100])
+	# 	return self._data_coll_freq == other._data_coll_freq
 	
-	def select_row_temperature(self):
-		return ((x[0],x[2]) for x in self.original_data)
-	def select_max_temperature(self):
-		return (max(x[2] for x in self.original_data))
-	def select_min_temperature(self):
-		return (min(x[2] for x in self.original_data))
-	def select_average_temperature(self):
-		return (round(mean(x[2] for x in self.original_data),2))
-	def select_median_temperature(self):
-		return (median(x[2] for x in self.original_data))
+	# def select_row_temperature(self):
+	# 	return ((x[0],x[2]) for x in self.original_data)
+	# def select_max_temperature(self):
+	# 	return (max(row['celsius'] for row in self.original_data))
+	# def select_min_temperature(self):
+	# 	return (min(x[2] for x in self.original_data))
+	# def select_average_temperature(self):
+	# 	return (round(mean(x[2] for x in self.original_data),2))
+	# def select_median_temperature(self):
+	# 	return (median(x[2] for x in self.original_data))
 	
-	def determine_ave_data_coll_frequency(self):
-		time_diffs = list(self.get_time_diff())  # List of timedelta objects
-		avg_timedelta = sum(time_diffs, timedelta()) / len(time_diffs)
-		return avg_timedelta
+	# def determine_ave_data_coll_frequency(self):
+	# 	time_diffs = list(self.get_time_diff())  # List of timedelta objects
+	# 	avg_timedelta = sum(time_diffs, timedelta()) / len(time_diffs)
+	# 	return avg_timedelta
 
-	def get_time_diff(self):
-		prev_timestamp = None
-		for row in self._original_data:
-			if prev_timestamp is not None:
-				yield row[1] - prev_timestamp
-			prev_timestamp = row[1]
+	# def get_time_diff(self):
+	# 	prev_timestamp = None
+	# 	for row in self._original_data:
+	# 		if prev_timestamp is not None:
+	# 			yield row[1] - prev_timestamp
+	# 		prev_timestamp = row[1]
 	
 
 	@property
 	def original_data(self):
 		return self._original_data
-	@property
-	def min(self):
-		return self._min
-	@property
-	def max(self):
-		return self._max
-	@property
-	def average(self):
-		return self._average
-	@property
-	def median(self):
-		return self._median
+	# @property
+	# def min(self):
+	# 	return self._min
+	# @property
+	# def max(self):
+	# 	return self._max
+	# @property
+	# def average(self):
+	# 	return self._average
+	# @property
+	# def median(self):
+	# 	return self._median
 
 
 class USBLogger():
@@ -178,18 +179,43 @@ class XLSXReport():
 #___________________________________________________________________________________________________________________
 #	HELPER FUNCTIONS BELOW:
 
+# def obtain_serial_numb_temps_from(file_contents, serial_no_idx):
+# 	temperature_data = []
+# 	serial_no = None
+# 	for line in file_contents:
+# 		split_line = line.split(",")
+
+# 		row_numb = int(split_line[0].strip())
+# 		date_time = datetime.strptime(split_line[1].strip(),"%Y-%m-%d %H:%M:%S")
+# 		celsius = float(split_line[2].strip())
+# 		if len(split_line) > 3:
+# 			high_alarm = float(split_line[3].strip()) if split_line[3].strip() else None
+# 		if len(split_line) > 4:
+# 			low_alarm = float(split_line[4].strip()) if split_line[4].strip() else None
+# 		if not serial_no:
+# 			serial_no = split_line[serial_no_idx].strip() #serial number found once per file in serial_no_idx column
+# 		temperature_data.append((row_numb, date_time, celsius,high_alarm, low_alarm))
+# 	return serial_no, temperature_data
+
 def obtain_serial_numb_temps_from(file_contents, serial_no_idx):
 	temperature_data = []
 	serial_no = None
 	for line in file_contents:
 		split_line = line.split(",")
-		row_numb = int(split_line[0].strip())
-		date_time = datetime.strptime(split_line[1].strip(),"%Y-%m-%d %H:%M:%S")
-		celsius = float(split_line[2].strip())
+		row_data = {
+            'row_number': int(split_line[0].strip()),
+            'date_time': datetime.strptime(split_line[1].strip(), "%Y-%m-%d %H:%M:%S"),
+            'celsius': float(split_line[2].strip())
+        }
+		if len(split_line) > 3:
+			row_data['high_alarm'] = float(split_line[3].strip()) if split_line[3].strip() else None
+		if len(split_line) > 4:
+			row_data['low_alarm'] = float(split_line[4].strip()) if split_line[4].strip() else None
 		if not serial_no:
-			serial_no = split_line[serial_no_idx].strip() #serial number found once per file in serial_no_idx column
-		temperature_data.append((row_numb, date_time, celsius))
+			serial_no = split_line[serial_no_idx].strip()
+		temperature_data.append(row_data)
 	return serial_no, temperature_data
+
 
 def obtain_logger_id_from(header):
 	split_header = [field.strip() for field in header.split(',')]
@@ -282,10 +308,12 @@ if __name__ == '__main__':
 # 	file.insert_data_xlsx()
 # 	file.insert_graph_xlsx()
 
-	file_list = [FILE_1,FILE_2,FILE_3,FILE_4,FILE_5,FILE_6,FILE_7,FILE_8]
-	usb_loggers = [USBLogger.read_from(file) for file in file_list]
-	# report = XLSXReport(*usb_loggers)
-	# report.insert_data_xlsx()
-	# report.insert_graph_xlsx()
-	for logger in usb_loggers:
-		print(logger.data._data_coll_freq)
+	# file_list = [FILE_1,FILE_2,FILE_3,FILE_4,FILE_5,FILE_6,FILE_7,FILE_8]
+	# usb_loggers = [USBLogger.read_from(file) for file in file_list]
+	# # report = XLSXReport(*usb_loggers)
+	# # report.insert_data_xlsx()
+	# # report.insert_graph_xlsx()
+	# for logger in usb_loggers:
+	# 	print(logger.data._data_coll_freq)
+	usb_logger_3 = USBLogger.read_from(FILE_3)
+	print(usb_logger_3.data.original_data)
