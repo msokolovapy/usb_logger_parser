@@ -4,6 +4,7 @@ from datetime import datetime
 from openpyxl import Workbook
 from openpyxl.chart import ScatterChart, Reference, Series
 from datetime import timedelta
+from collections import Counter
 
 
 FILE_1 = r'N:\GMP Quality Assurance\QA Accessible Documents\Data Logger Downloads\Temperature Mapping\ACPL228\Nov 2025\ACPL149_ACPL228.txt'
@@ -21,64 +22,71 @@ class TemperatureData():
 	Instances of this class can be compared to each other using '==' operator"""
 	def __init__(self, temperature_data):
 		self._original_data = temperature_data #list of (row_number, date_time_stamp, degrees_celsius) tuples
-		# self._max = self.select_max_temperature()
-		# self._min = self.select_min_temperature()
-		# self._average = self.select_average_temperature()
-		# self._median = self.select_median_temperature()
-		# self._data_coll_freq = self.determine_ave_data_coll_frequency()
-		# self._reported_data_matrix_size = (3,len(self._original_data))
+		self._max = self.select_max_temperature()
+		self._min = self.select_min_temperature()
+		self._average = self.select_average_temperature()
+		self._median = self.select_median_temperature()
+		self._data_coll_freq = self.determine_ave_data_coll_frequency()
+		self._xlsx_report_data_matrix_size = {'data_width':min(3, self.data_matrix_width), # flexible selection of the number of data columns to display on xlsx report
+								'data_lenth':len(self._original_data)}
 
-	# def __eq__(self, other):
-	# 	if not isinstance(other, TemperatureData):
-	# 		raise TypeError('Wrong instance type when trying to compare temperature datasets')
-	# 	# diff = []
-	# 	# #use zip_longest to ensure that data sets of different lengths get zipped properly
-	# 	# for i,data in enumerate(zip_longest(self.select_row_temperature(), other.select_row_temperature(), fillvalue = None)):
-	# 	# 	data1, data2 = data
-	# 	# 	if data1 != data2:
-	# 	# 		diff.append((i+1,data1,data2)) #uses i+1 to simplify reading of the below print statement
-	# 	# create_print_statement(diff[:100])
-	# 	return self._data_coll_freq == other._data_coll_freq
+	def __eq__(self, other):
+		if not isinstance(other, TemperatureData):
+			raise TypeError('Wrong instance type when trying to compare temperature datasets')
+		# diff = []
+		# #use zip_longest to ensure that data sets of different lengths get zipped properly
+		# for i,data in enumerate(zip_longest(self.select_row_temperature(), other.select_row_temperature(), fillvalue = None)):
+		# 	data1, data2 = data
+		# 	if data1 != data2:
+		# 		diff.append((i+1,data1,data2)) #uses i+1 to simplify reading of the below print statement
+		# create_print_statement(diff[:100])
+		return self._data_coll_freq == other._data_coll_freq
 	
 	# def select_row_temperature(self):
 	# 	return ((x[0],x[2]) for x in self.original_data)
-	# def select_max_temperature(self):
-	# 	return (max(row['celsius'] for row in self.original_data))
-	# def select_min_temperature(self):
-	# 	return (min(x[2] for x in self.original_data))
-	# def select_average_temperature(self):
-	# 	return (round(mean(x[2] for x in self.original_data),2))
-	# def select_median_temperature(self):
-	# 	return (median(x[2] for x in self.original_data))
+	def select_max_temperature(self):
+		return (max(row['celsius'] for row in self.original_data))
+	def select_min_temperature(self):
+		return (min(row['celsius'] for row in self.original_data))
+	def select_average_temperature(self):
+		return (round(mean(row['celsius'] for row in self.original_data),2))
+	def select_median_temperature(self):
+		return (median(row['celsius'] for row in self.original_data))
 	
-	# def determine_ave_data_coll_frequency(self):
-	# 	time_diffs = list(self.get_time_diff())  # List of timedelta objects
-	# 	avg_timedelta = sum(time_diffs, timedelta()) / len(time_diffs)
-	# 	return avg_timedelta
+	def determine_ave_data_coll_frequency(self):
+		time_diffs = list(self.get_time_diff())  # List of timedelta objects
+		avg_timedelta = sum(time_diffs, timedelta()) / len(time_diffs)
+		return avg_timedelta
 
-	# def get_time_diff(self):
-	# 	prev_timestamp = None
-	# 	for row in self._original_data:
-	# 		if prev_timestamp is not None:
-	# 			yield row[1] - prev_timestamp
-	# 		prev_timestamp = row[1]
+	def get_time_diff(self):
+		prev_timestamp = None
+		for row in self._original_data:
+			if prev_timestamp is not None:
+				yield row['date_time'] - prev_timestamp
+			prev_timestamp = row['date_time']
 	
 
 	@property
 	def original_data(self):
 		return self._original_data
-	# @property
-	# def min(self):
-	# 	return self._min
-	# @property
-	# def max(self):
-	# 	return self._max
-	# @property
-	# def average(self):
-	# 	return self._average
-	# @property
-	# def median(self):
-	# 	return self._median
+	@property 
+	def data_matrix_width(self):
+		return len(self._original_data[0])
+	@property
+	def min(self):
+		return self._min
+	@property
+	def max(self):
+		return self._max
+	@property
+	def average(self):
+		return self._average
+	@property
+	def median(self):
+		return self._median
+	@property
+	def xlsx_report_data_matrix_size(self):
+		return self._xlsx_report_data_matrix_size
 
 
 class USBLogger():
@@ -86,7 +94,7 @@ class USBLogger():
 		self._data = TemperatureData(data)
 		self._id = logger_id
 		self._serial_number = serial_no
-		self._xlsx_header = [self._serial_number, self._id]
+		self._xlsx_header = [self._serial_number, self._id] #determines which data to include into the xlsx report header
 	
 	@classmethod
 	def read_from(cls,file_path):
@@ -130,7 +138,6 @@ class XLSXReport():
 		self._wb = Workbook()
 		self._x_axis_column = None
 		
-
 	def get_file_name(self):
 		formatted_today = datetime.now().strftime('%Y-%m-%d')
 		return f'{formatted_today}_usb_data_loggers'
@@ -162,8 +169,6 @@ class XLSXReport():
 			max_row_value = max(len(logger.data.original_data) for logger in self.loggers)
 			return max_row_value
 		
-
-
 
 	@property
 	def loggers(self):
@@ -202,17 +207,21 @@ def obtain_serial_numb_temps_from(file_contents, serial_no_idx):
 	serial_no = None
 	for line in file_contents:
 		split_line = line.split(",")
+		if not serial_no:
+			serial_no = split_line[serial_no_idx].strip()
 		row_data = {
             'row_number': int(split_line[0].strip()),
             'date_time': datetime.strptime(split_line[1].strip(), "%Y-%m-%d %H:%M:%S"),
             'celsius': float(split_line[2].strip())
         }
 		if len(split_line) > 3:
-			row_data['high_alarm'] = float(split_line[3].strip()) if split_line[3].strip() else None
-		if len(split_line) > 4:
-			row_data['low_alarm'] = float(split_line[4].strip()) if split_line[4].strip() else None
-		if not serial_no:
-			serial_no = split_line[serial_no_idx].strip()
+			if serial_no == split_line[3].strip():
+				pass
+			else:
+				row_data['high_alarm'] = float(split_line[3].strip()) if split_line[3].strip() else None
+			if len(split_line) > 4:
+				row_data['low_alarm'] = float(split_line[4].strip()) if split_line[4].strip() else None
+
 		temperature_data.append(row_data)
 	return serial_no, temperature_data
 
@@ -308,12 +317,20 @@ if __name__ == '__main__':
 # 	file.insert_data_xlsx()
 # 	file.insert_graph_xlsx()
 
-	# file_list = [FILE_1,FILE_2,FILE_3,FILE_4,FILE_5,FILE_6,FILE_7,FILE_8]
-	# usb_loggers = [USBLogger.read_from(file) for file in file_list]
-	# # report = XLSXReport(*usb_loggers)
-	# # report.insert_data_xlsx()
-	# # report.insert_graph_xlsx()
-	# for logger in usb_loggers:
-	# 	print(logger.data._data_coll_freq)
-	usb_logger_3 = USBLogger.read_from(FILE_3)
-	print(usb_logger_3.data.original_data)
+	file_list = [FILE_1,FILE_2,FILE_3,FILE_4,FILE_5,FILE_6,FILE_7,FILE_8]
+	usb_loggers = [USBLogger.read_from(file) for file in file_list]
+	# report = XLSXReport(*usb_loggers)
+	# report.insert_data_xlsx()
+	# report.insert_graph_xlsx()
+	reference = usb_loggers[0].data
+	for i in range(len(usb_loggers)):
+		if usb_loggers[i].data != reference:
+			print(f'Usb logger {usb_loggers[i].serial_number} ')
+
+
+	frequencies = [logger.data._data_coll_freq for logger in usb_loggers]
+	most_common = Counter(frequencies).most_common()[0][0]
+
+	for i, logger in enumerate(usb_loggers):
+		if logger.data._data_coll_freq != most_common:
+			print(f"Logger {logger.id} is an outlier: data collection frequency is {logger.data._data_coll_freq} as compared to most common frequency of {most_common}")
