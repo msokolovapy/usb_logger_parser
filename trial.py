@@ -27,8 +27,7 @@ class TemperatureData():
 		self._average = self.select_average_temperature()
 		self._median = self.select_median_temperature()
 		self._data_coll_freq = self.determine_ave_data_coll_frequency()
-		self._xlsx_report_data_matrix_size = {'data_width':min(3, self.data_matrix_width), # flexible selection of the number of data columns to display on xlsx report
-								'data_lenth':len(self._original_data)}
+		self._xlsx_report_data_matrix_size = {'data_width':len(self._original_data[0]),	'data_lenth':len(self._original_data)}
 
 	def __eq__(self, other):
 		if not isinstance(other, TemperatureData):
@@ -69,9 +68,6 @@ class TemperatureData():
 	@property
 	def original_data(self):
 		return self._original_data
-	@property 
-	def data_matrix_width(self):
-		return len(self._original_data[0])
 	@property
 	def min(self):
 		return self._min
@@ -87,6 +83,9 @@ class TemperatureData():
 	@property
 	def xlsx_report_data_matrix_size(self):
 		return self._xlsx_report_data_matrix_size
+	@property
+	def data_coll_freq(self):
+		return self._data_coll_freq
 
 
 class USBLogger():
@@ -94,7 +93,6 @@ class USBLogger():
 		self._data = TemperatureData(data)
 		self._id = logger_id
 		self._serial_number = serial_no
-		self._xlsx_header = [self._serial_number, self._id] #determines which data to include into the xlsx report header
 	
 	@classmethod
 	def read_from(cls,file_path):
@@ -103,22 +101,30 @@ class USBLogger():
 		logger_id, serial_no_idx = obtain_logger_id_from(header)
 		serial_no, temperature_data = obtain_serial_numb_temps_from(file_contents, serial_no_idx)
 		return cls(logger_id,serial_no,temperature_data)
-	
-	# def prepare_for_reporting(self):
-	# 	#adds logger id and serial number to the temp data
-	# 	copy_temp_data = self.data.original_data.copy()
-	# 	copy_temp_data.insert(0,(None,None,self.serial_number)) #inserts None, which will represent empty cells further
-	# 	copy_temp_data.insert(0,(None,None,self.id)) #same as above
-	# 	return copy_temp_data
 
 	def prepare_for_reporting(self):
 		#inserts additional data fields to the temp data for better readability when using xlsx report
-		copy_temp_data = self.data.original_data.copy()
-		rows_to_insert = [(None,None,row) for row in self._xlsx_header]	
-		print(rows_to_insert)
-		for row in rows_to_insert:
-			copy_temp_data.insert(0, row)
+		copy_temp_data = [tuple(data_point.values()) for data_point in self._data.original_data]
+		data_width = self._data.xlsx_report_data_matrix_size['data_width'] 
+
+		header = self.prepare_header(data_width)
+		column_names = self.prepare_column_names(data_width)
+		
+		copy_temp_data.insert(0,column_names)	
+		for element in header:
+			copy_temp_data.insert(0, element)
 		return copy_temp_data
+
+	def prepare_column_names(self, data_width):
+		#returns column names for xlsx report such as 'row_numb', 'date_time', 'celsius' based on required data width
+		column_names = list(self._data.original_data[0].keys())[:data_width]
+		column_names = tuple(column_names)
+		return column_names
+
+	def prepare_header(self, data_width):
+		header = [self._id, self._serial_number] #logger metadata allows easy logger data identification when multiple logger data traces are overlayed in xlsx report
+		padded_header = pad_header_with_Nones(header,data_width)
+		return padded_header
 	
 	@property
 	def data(self):
@@ -142,7 +148,7 @@ class XLSXReport():
 		formatted_today = datetime.now().strftime('%Y-%m-%d')
 		return f'{formatted_today}_usb_data_loggers'
 	
-	def insert_data_xlsx(self):
+	def insert_data(self):
 		ws = self.wb.active
 		ws.title = self.file_name
 		for i, usb_logger in enumerate(self.loggers):
@@ -154,7 +160,7 @@ class XLSXReport():
 				ws.cell(row=row_idx, column=start_col + 2, value=celsius)
 		return self.wb
 	
-	def insert_graph_xlsx(self):
+	def insert_graph(self):
 		ws = self.wb[f'{self.file_name}']
 		chart = ScatterChart()
 		chart.title = "Temperature Data"
@@ -259,6 +265,16 @@ def data_coll_freq_identical(loggers):
 				Try again by choosing usb loggers with identical data collection frequency to \
 				ensure meaningful data comparison')
 
+def pad_header_with_Nones(header,data_width):
+	number_Nones = data_width - 1
+	padded_header = []
+	for logger_metadata in header:
+		padded_element = []
+		for _ in range(number_Nones):
+			padded_element.append(None)
+		padded_element.append(logger_metadata)	
+		padded_header.append(tuple(padded_element))
+	return padded_header
 #_______________________________________________________________________________________
 
 # from openpyxl import Workbook
@@ -302,6 +318,18 @@ def data_coll_freq_identical(loggers):
 
 # wb.save("C:/Users/User/Desktop/Misc/scatter.xlsx")
 
+
+# 		
+
+
+
+# self.x_axis_column = 18 aka max_row -> class XLSXReport knows max_row_value
+
+# min_row depends on the size of inserted header, which is padded with None to account for empty columns -> Need to take into account data matrix size
+
+# min_column starts at 10 to allow for no overlap with the graph in A1.
+
+
 	
 if __name__ == '__main__':
 # 	usb_logger_1 = USBLogger.read_from(FILE_1)
@@ -317,20 +345,22 @@ if __name__ == '__main__':
 # 	file.insert_data_xlsx()
 # 	file.insert_graph_xlsx()
 
+	# file_list = [FILE_1,FILE_2,FILE_3,FILE_4,FILE_5,FILE_6,FILE_7,FILE_8]
+	# usb_loggers = [USBLogger.read_from(file) for file in file_list]
+	# report = XLSXReport(*usb_loggers)
+	# report.insert_data()
+	# report.insert_graph()
+	
+	# frequencies = [logger.data.data_coll_freq for logger in usb_loggers]
+	# most_common = Counter(frequencies).most_common()[0][0]
+
+	# for i, logger in enumerate(usb_loggers):
+	# 	if logger.data.data_coll_freq != most_common:
+	# 		print(f"Logger {logger.id} is an outlier: data collection frequency is {logger.data._data_coll_freq} as compared to most common frequency of {most_common}")
+
+
 	file_list = [FILE_1,FILE_2,FILE_3,FILE_4,FILE_5,FILE_6,FILE_7,FILE_8]
 	usb_loggers = [USBLogger.read_from(file) for file in file_list]
-	# report = XLSXReport(*usb_loggers)
-	# report.insert_data_xlsx()
-	# report.insert_graph_xlsx()
-	reference = usb_loggers[0].data
-	for i in range(len(usb_loggers)):
-		if usb_loggers[i].data != reference:
-			print(f'Usb logger {usb_loggers[i].serial_number} ')
-
-
-	frequencies = [logger.data._data_coll_freq for logger in usb_loggers]
-	most_common = Counter(frequencies).most_common()[0][0]
-
-	for i, logger in enumerate(usb_loggers):
-		if logger.data._data_coll_freq != most_common:
-			print(f"Logger {logger.id} is an outlier: data collection frequency is {logger.data._data_coll_freq} as compared to most common frequency of {most_common}")
+	for logger in usb_loggers:
+		prepared_data = logger.prepare_for_reporting()
+		print(f'First five rows of Logger {logger.id} data are {prepared_data[:5]}')
