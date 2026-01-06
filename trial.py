@@ -27,7 +27,7 @@ class TemperatureData():
 		self._average = self.select_average_temperature()
 		self._median = self.select_median_temperature()
 		self._data_coll_freq = self.determine_ave_data_coll_frequency()
-		self._xlsx_report_data_matrix_size = {'data_width':len(self._original_data[0]),	'data_lenth':len(self._original_data)}
+		self._data_matrix_size = {'data_width':len(self._original_data[0]),	'data_lenth':len(self._original_data)}
 
 	def __eq__(self, other):
 		if not isinstance(other, TemperatureData):
@@ -81,8 +81,8 @@ class TemperatureData():
 	def median(self):
 		return self._median
 	@property
-	def xlsx_report_data_matrix_size(self):
-		return self._xlsx_report_data_matrix_size
+	def data_matrix_size(self):
+		return self._data_matrix_size
 	@property
 	def data_coll_freq(self):
 		return self._data_coll_freq
@@ -105,7 +105,7 @@ class USBLogger():
 	def prepare_for_reporting(self):
 		#inserts additional data fields to the temp data for better readability when using xlsx report
 		copy_temp_data = [tuple(data_point.values()) for data_point in self._data.original_data]
-		data_width = self._data.xlsx_report_data_matrix_size['data_width'] 
+		data_width = self._data.data_matrix_size['data_width'] 
 
 		header = self.prepare_header(data_width)
 		column_names = self.prepare_column_names(data_width)
