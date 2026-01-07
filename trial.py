@@ -1,4 +1,4 @@
-from itertools import zip_longest
+import os
 from statistics import mean, median
 from datetime import datetime
 from openpyxl import Workbook
@@ -29,20 +29,6 @@ class TemperatureData():
 		self._data_coll_freq = self.determine_ave_data_coll_frequency()
 		self._data_matrix_size = {'data_width':len(self._original_data[0]),	'data_lenth':len(self._original_data)}
 
-	# def __eq__(self, other):
-	# 	if not isinstance(other, TemperatureData):
-	# 		raise TypeError('Wrong instance type when trying to compare temperature datasets')
-	# 	# diff = []
-	# 	# #use zip_longest to ensure that data sets of different lengths get zipped properly
-	# 	# for i,data in enumerate(zip_longest(self.select_row_temperature(), other.select_row_temperature(), fillvalue = None)):
-	# 	# 	data1, data2 = data
-	# 	# 	if data1 != data2:
-	# 	# 		diff.append((i+1,data1,data2)) #uses i+1 to simplify reading of the below print statement
-	# 	# create_print_statement(diff[:100])
-	# 	return self._data_coll_freq == other._data_coll_freq
-	
-	# def select_row_temperature(self):
-	# 	return ((x[0],x[2]) for x in self.original_data)
 	def select_max_temperature(self):
 		return (max(row['celsius'] for row in self.original_data))
 	def select_min_temperature(self):
@@ -144,12 +130,22 @@ class XLSXReport():
 		self._wb = Workbook()
 		self._x_axis_column = None
 		self._data_location = []
+
+	@classmethod
+	def create_from(cls, loggers):
+		if data_collection_frequency_check(loggers):
+			return cls(loggers = loggers)
+		return cls(loggers = [])
+
 		
 	def get_file_name(self):
 		formatted_today = datetime.now().strftime('%Y-%m-%d')
 		return f'{formatted_today}_usb_data_loggers'
+	
 
 	def insert_data(self):
+		if not self._loggers:
+			return None
 		ws = self.wb.active
 		ws.title = self.file_name
 		start_col = 10 #column count starts at 10 to avoid overlapping data with the chart in A1
@@ -173,19 +169,10 @@ class XLSXReport():
 			start_col = start_col + usb_logger.data.data_matrix_size['data_width'] + 1
 			self._data_location.append({usb_logger:{'x_axis_location':x_axis_location,'y_axis_location':y_axis_location}})
 		return self.wb
-	
-	# def insert_graph(self):
-	# 	ws = self.wb[f'{self.file_name}']
-	# 	chart = ScatterChart()
-	# 	chart.title = "Temperature Data"
-	# 	chart.x_axis.title = "Row"
-	# 	chart.y_axis.title = "Temperature (°C)"
-	# 	chart.x_axis.delete = False
-	# 	chart.y_axis.delete = False
-	# 	ws.add_chart(chart, "A1")
-	# 	self.wb.save(rf'C:\Users\User\Desktop\Misc\{self._file_name}.xlsx')
 
 	def insert_graph(self):
+		if not self._loggers:
+			return None
 		ws = self.wb[f'{self.file_name}']
 		chart = ScatterChart()
 		chart.title = "Temperature Data"
@@ -204,11 +191,14 @@ class XLSXReport():
 				series = Series(y_values, x_values, title = logger.id)
 				chart.series.append(series)
 		ws.add_chart(chart, "A1")
-		self.wb.save(rf'C:\Users\User\Desktop\Misc\{self._file_name}.xlsx')
+		file_path_save = rf'C:\Users\User\Desktop\Misc\{self._file_name}.xlsx'
+		self.wb.save(file_path_save)
+		os.startfile(file_path_save)
+
 	
-	def determine_max_row_value(self):
-			max_row_value = max(len(logger.data.original_data) for logger in self.loggers)
-			return max_row_value
+	# def determine_max_row_value(self):
+	# 		max_row_value = max(len(logger.data.original_data) for logger in self.loggers)
+	# 		return max_row_value
 		
 
 	@property
@@ -220,10 +210,23 @@ class XLSXReport():
 	@property
 	def wb(self):
 		return self._wb
+	@property
+	def data_frequency_check(self):
+		return self.data_frequency_check()
 
 	
 #___________________________________________________________________________________________________________________
 #	HELPER FUNCTIONS BELOW:
+
+
+def data_collection_frequency_check(usb_loggers):
+	frequencies = [logger.data.data_coll_freq for logger in usb_loggers]
+	most_common = Counter(frequencies).most_common()[0][0]
+	for i, logger in enumerate(usb_loggers):
+		if logger.data.data_coll_freq != most_common:
+			print(f"Logger {logger.id} is an outlier: its data collection frequency is {logger.data._data_coll_freq} as compared to most common frequency of {most_common}\nRemove this logger and try again")
+			return None
+	return True
 
 def obtain_serial_numb_temps_from(file_contents, serial_no_idx):
 	temperature_data = []
@@ -256,31 +259,31 @@ def obtain_logger_id_from(header):
 	return id, serial_no_idx
 
 
-def create_print_statement(diff_data):
-	#formats differences in two data sets to enable easy reading in terminal window
-	if not diff_data:
-		print('Two temperature data sets are identical')
-	else:
-		i = len(diff_data)
-		j = min(20,i) #max 20 different data points to display in terminal for ease of reading
-		trunc_diff_data = diff_data[:j]		
-		print(f'There are {i} different data point/s found between two temperature data sets.\nOnly first {j} data point/s are shown: \nPosition|Data set 1|Data set 2')
-		for row in trunc_diff_data:
-			index, data1, data2 = row
-			formatted_data = f'{index:^8}|{str(data1):^10}|{str(data2):^10}'
-			print(formatted_data)
+# def create_print_statement(diff_data):
+# 	#formats differences in two data sets to enable easy reading in terminal window
+# 	if not diff_data:
+# 		print('Two temperature data sets are identical')
+# 	else:
+# 		i = len(diff_data)
+# 		j = min(20,i) #max 20 different data points to display in terminal for ease of reading
+# 		trunc_diff_data = diff_data[:j]		
+# 		print(f'There are {i} different data point/s found between two temperature data sets.\nOnly first {j} data point/s are shown: \nPosition|Data set 1|Data set 2')
+# 		for row in trunc_diff_data:
+# 			index, data1, data2 = row
+# 			formatted_data = f'{index:^8}|{str(data1):^10}|{str(data2):^10}'
+# 			print(formatted_data)
 
 
-@property
-def data_coll_freq_identical(loggers):
-	if len(set(loggers.data)) == 1:
-		return True
-	else:
-		logger_ids = [logger.id for logger in set(loggers)]
-		string_to_display = ', '.join(logger_ids)
-		print(f'The following usb loggers have different data collection frequencies: {string_to_display}. \
-				Try again by choosing usb loggers with identical data collection frequency to \
-				ensure meaningful data comparison')
+# @property
+# def data_coll_freq_identical(loggers):
+# 	if len(set(loggers.data)) == 1:
+# 		return True
+# 	else:
+# 		logger_ids = [logger.id for logger in set(loggers)]
+# 		string_to_display = ', '.join(logger_ids)
+# 		print(f'The following usb loggers have different data collection frequencies: {string_to_display}. \
+# 				Try again by choosing usb loggers with identical data collection frequency to \
+# 				ensure meaningful data comparison')
 
 def pad_header_with_Nones(header,data_width):
 	number_Nones = data_width - 1
@@ -299,93 +302,11 @@ def get_data_start_end(logger_data, column_names):
 	row_max = len(logger_data)
 	return row_min, row_max
 
-#_______________________________________________________________________________________
-
-# from openpyxl import Workbook
-# from openpyxl.chart import (
-#     ScatterChart,
-#     Reference,
-#     Series,
-# )
-
-# wb = Workbook()
-# ws = wb.active
-
-# rows = [
-#     ['Size', 'Batch 1', 'Batch 2'],
-#     [2, 40, 30],
-#     [3, 40, 25],
-#     [4, 50, 30],
-#     [5, 30, 25],
-#     [6, 25, 35],
-#     [7, 20, 40],
-# ]
-
-# for row in rows:
-#     ws.append(row)
-
-# chart = ScatterChart()
-# chart.title = "Scatter Chart"
-# chart.style = 13
-# chart.x_axis.title = 'Size'
-# chart.y_axis.title = 'Percentage'
-# chart.x_axis.delete = False
-# chart.y_axis.delete = False
-
-# xvalues = Reference(ws, min_col=1, min_row=2, max_row=7)
-# for i in range(2, 4):
-#     values = Reference(ws, min_col=i, min_row=1, max_row=7)
-#     series = Series(values, xvalues, title_from_data=True)
-#     chart.series.append(series)
-
-# ws.add_chart(chart, "A10")
-
-# wb.save("C:/Users/User/Desktop/Misc/scatter.xlsx")
-
-
-# 		
-
-
-
-# self.x_axis_column = 18 aka max_row -> class XLSXReport knows max_row_value
-
-# min_row depends on the size of inserted header, which is padded with None to account for empty columns -> Need to take into account data matrix size
-
-# min_column starts at 10 to allow for no overlap with the graph in A1.
-
-
 	
-if __name__ == '__main__':
-# 	usb_logger_1 = USBLogger.read_from(FILE_1)
-# 	usb_logger_2 = USBLogger.read_from(FILE_2)
-# # 	print(f'{usb_logger_1.id} data logger serial number: {usb_logger_1.serial_number}')
-# # 	print(f'{usb_logger_2.id} data logger serial number: {usb_logger_2.serial_number}')
-# # 	usb_logger_1.data == usb_logger_2.data
-# # 	print(f'{usb_logger_1.id} data logger min detected temperature: {usb_logger_1.data.min}')
-# # 	print(f'{usb_logger_2.id} data logger max detected temperature: {usb_logger_2.data.max}')
-# # 	print(f'{usb_logger_1.id} data logger average detected temperature: {usb_logger_1.data.average}')
-# # 	print(f'{usb_logger_2.id} data logger median detected temperature: {usb_logger_2.data.median}')
-# 	file = XLSXReport(usb_logger_1,usb_logger_2)
-# 	file.insert_data_xlsx()
-# 	file.insert_graph_xlsx()
-
-	# file_list = [FILE_1,FILE_2,FILE_3,FILE_4,FILE_5,FILE_6,FILE_7,FILE_8]
-	# usb_loggers = [USBLogger.read_from(file) for file in file_list]
-	# report = XLSXReport(*usb_loggers)
-	# report.insert_data()
-	# report.insert_graph()
-	
-	# frequencies = [logger.data.data_coll_freq for logger in usb_loggers]
-	# most_common = Counter(frequencies).most_common()[0][0]
-
-	# for i, logger in enumerate(usb_loggers):
-	# 	if logger.data.data_coll_freq != most_common:
-	# 		print(f"Logger {logger.id} is an outlier: data collection frequency is {logger.data._data_coll_freq} as compared to most common frequency of {most_common}")
-
-
-	file_list = [FILE_1,FILE_2,FILE_3,FILE_4,FILE_5,FILE_6,FILE_7,FILE_8]
+if __name__ == '__main__':	
+	# file_list = [FILE_1,FILE_2,FILE_3,FILE_5,FILE_6,FILE_7,FILE_8]
+	file_list = [FILE_1]
 	usb_loggers = [USBLogger.read_from(file) for file in file_list]
-	report = XLSXReport(usb_loggers)
-
+	report = XLSXReport.create_from(usb_loggers)
 	report.insert_data()
 	report.insert_graph()
