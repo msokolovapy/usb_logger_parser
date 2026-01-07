@@ -29,17 +29,17 @@ class TemperatureData():
 		self._data_coll_freq = self.determine_ave_data_coll_frequency()
 		self._data_matrix_size = {'data_width':len(self._original_data[0]),	'data_lenth':len(self._original_data)}
 
-	def __eq__(self, other):
-		if not isinstance(other, TemperatureData):
-			raise TypeError('Wrong instance type when trying to compare temperature datasets')
-		# diff = []
-		# #use zip_longest to ensure that data sets of different lengths get zipped properly
-		# for i,data in enumerate(zip_longest(self.select_row_temperature(), other.select_row_temperature(), fillvalue = None)):
-		# 	data1, data2 = data
-		# 	if data1 != data2:
-		# 		diff.append((i+1,data1,data2)) #uses i+1 to simplify reading of the below print statement
-		# create_print_statement(diff[:100])
-		return self._data_coll_freq == other._data_coll_freq
+	# def __eq__(self, other):
+	# 	if not isinstance(other, TemperatureData):
+	# 		raise TypeError('Wrong instance type when trying to compare temperature datasets')
+	# 	# diff = []
+	# 	# #use zip_longest to ensure that data sets of different lengths get zipped properly
+	# 	# for i,data in enumerate(zip_longest(self.select_row_temperature(), other.select_row_temperature(), fillvalue = None)):
+	# 	# 	data1, data2 = data
+	# 	# 	if data1 != data2:
+	# 	# 		diff.append((i+1,data1,data2)) #uses i+1 to simplify reading of the below print statement
+	# 	# create_print_statement(diff[:100])
+	# 	return self._data_coll_freq == other._data_coll_freq
 	
 	# def select_row_temperature(self):
 	# 	return ((x[0],x[2]) for x in self.original_data)
@@ -138,28 +138,53 @@ class USBLogger():
 	
 
 class XLSXReport():
-	def __init__(self, *loggers):
-		self._loggers = list(loggers)
+	def __init__(self, loggers):
+		self._loggers = loggers
 		self._file_name = self.get_file_name()
 		self._wb = Workbook()
 		self._x_axis_column = None
+		self._data_location = []
 		
 	def get_file_name(self):
 		formatted_today = datetime.now().strftime('%Y-%m-%d')
 		return f'{formatted_today}_usb_data_loggers'
-	
+
 	def insert_data(self):
 		ws = self.wb.active
 		ws.title = self.file_name
-		for i, usb_logger in enumerate(self.loggers):
-			start_col = 10 + (i * 4)  # 3 data columns + 1 skip = 4 spacing
+		start_col = 10 #column count starts at 10 to avoid overlapping data with the chart in A1
+		x_axis_location = {'min_col':0, 'min_row':0, 'max_row':0}
+
+		for usb_logger in self.loggers:
 			usb_logger_data = usb_logger.prepare_for_reporting()
-			for row_idx, (row_num, date_time, celsius) in enumerate(usb_logger_data, start=1):
-				ws.cell(row=row_idx, column=start_col, value=row_num)
-				ws.cell(row=row_idx, column=start_col + 1, value=date_time)
-				ws.cell(row=row_idx, column=start_col + 2, value=celsius)
+			column_names = usb_logger.prepare_column_names(usb_logger.data.data_matrix_size['data_width'])
+			row_min, row_max = get_data_start_end(usb_logger_data, column_names)
+
+			if row_max > x_axis_location['max_row']: #select longest data set to be used as x-axis in xlsx report for overlaying all usb loggers 
+				x_axis_location['min_row'] = row_min 
+				x_axis_location['max_row'] = row_max
+				x_axis_location['min_col'] = start_col
+			y_axis_location = {'min_col':start_col + 2, 'min_row':row_min, 'max_row':row_max}# select data for y-axis
+			
+			for row_idx, data_row in enumerate(usb_logger_data, start=1):
+				for column_idx,data_column in enumerate(data_row):
+					ws.cell(row=row_idx, column=start_col + column_idx, value = data_column)
+
+			start_col = start_col + usb_logger.data.data_matrix_size['data_width'] + 1
+			self._data_location.append({usb_logger:{'x_axis_location':x_axis_location,'y_axis_location':y_axis_location}})
 		return self.wb
 	
+	# def insert_graph(self):
+	# 	ws = self.wb[f'{self.file_name}']
+	# 	chart = ScatterChart()
+	# 	chart.title = "Temperature Data"
+	# 	chart.x_axis.title = "Row"
+	# 	chart.y_axis.title = "Temperature (°C)"
+	# 	chart.x_axis.delete = False
+	# 	chart.y_axis.delete = False
+	# 	ws.add_chart(chart, "A1")
+	# 	self.wb.save(rf'C:\Users\User\Desktop\Misc\{self._file_name}.xlsx')
+
 	def insert_graph(self):
 		ws = self.wb[f'{self.file_name}']
 		chart = ScatterChart()
@@ -168,6 +193,16 @@ class XLSXReport():
 		chart.y_axis.title = "Temperature (°C)"
 		chart.x_axis.delete = False
 		chart.y_axis.delete = False
+		chart.legend.overlay = False
+		
+		for data_location_dict in self._data_location: #data_location_dict is a list of nested dictionaries
+			for logger,data_location in data_location_dict.items():
+				x_axis_dict = data_location['x_axis_location']
+				y_axis_dict = data_location['y_axis_location']
+				x_values = Reference(ws, min_col=x_axis_dict['min_col'], min_row=x_axis_dict['min_row'], max_row=x_axis_dict['max_row'])
+				y_values = Reference(ws, min_col=y_axis_dict['min_col'], min_row=y_axis_dict['min_row'], max_row=y_axis_dict['max_row'])
+				series = Series(y_values, x_values, title = logger.id)
+				chart.series.append(series)
 		ws.add_chart(chart, "A1")
 		self.wb.save(rf'C:\Users\User\Desktop\Misc\{self._file_name}.xlsx')
 	
@@ -189,24 +224,6 @@ class XLSXReport():
 	
 #___________________________________________________________________________________________________________________
 #	HELPER FUNCTIONS BELOW:
-
-# def obtain_serial_numb_temps_from(file_contents, serial_no_idx):
-# 	temperature_data = []
-# 	serial_no = None
-# 	for line in file_contents:
-# 		split_line = line.split(",")
-
-# 		row_numb = int(split_line[0].strip())
-# 		date_time = datetime.strptime(split_line[1].strip(),"%Y-%m-%d %H:%M:%S")
-# 		celsius = float(split_line[2].strip())
-# 		if len(split_line) > 3:
-# 			high_alarm = float(split_line[3].strip()) if split_line[3].strip() else None
-# 		if len(split_line) > 4:
-# 			low_alarm = float(split_line[4].strip()) if split_line[4].strip() else None
-# 		if not serial_no:
-# 			serial_no = split_line[serial_no_idx].strip() #serial number found once per file in serial_no_idx column
-# 		temperature_data.append((row_numb, date_time, celsius,high_alarm, low_alarm))
-# 	return serial_no, temperature_data
 
 def obtain_serial_numb_temps_from(file_contents, serial_no_idx):
 	temperature_data = []
@@ -270,11 +287,18 @@ def pad_header_with_Nones(header,data_width):
 	padded_header = []
 	for logger_metadata in header:
 		padded_element = []
+		padded_element.append(logger_metadata)
 		for _ in range(number_Nones):
-			padded_element.append(None)
-		padded_element.append(logger_metadata)	
+			padded_element.append(None)	
 		padded_header.append(tuple(padded_element))
 	return padded_header
+
+def get_data_start_end(logger_data, column_names):
+	#uses column names to extract starting and ending data row indices and adjusts them for openpyxl. Data starts immediately after column names
+	row_min = logger_data.index(column_names) + 2
+	row_max = len(logger_data)
+	return row_min, row_max
+
 #_______________________________________________________________________________________
 
 # from openpyxl import Workbook
@@ -361,6 +385,7 @@ if __name__ == '__main__':
 
 	file_list = [FILE_1,FILE_2,FILE_3,FILE_4,FILE_5,FILE_6,FILE_7,FILE_8]
 	usb_loggers = [USBLogger.read_from(file) for file in file_list]
-	for logger in usb_loggers:
-		prepared_data = logger.prepare_for_reporting()
-		print(f'First five rows of Logger {logger.id} data are {prepared_data[:5]}')
+	report = XLSXReport(usb_loggers)
+
+	report.insert_data()
+	report.insert_graph()
