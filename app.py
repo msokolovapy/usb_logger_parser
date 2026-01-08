@@ -17,8 +17,7 @@ FILE_8 = r'N:\GMP Quality Assurance\QA Accessible Documents\Data Logger Download
 	
 	
 class TemperatureData():
-	"""This class stores temperature data obtained via Lascar USB data logger.
-	Instances of this class can be compared to each other using '==' operator"""
+	"""This class stores temperature data obtained via Lascar USB data logger"""
 	def __init__(self, temperature_data):
 		self._original_data = temperature_data #list of (row_number, date_time_stamp, degrees_celsius) tuples
 		self._max = self.select_max_temperature()
@@ -133,8 +132,8 @@ class XLSXReport():
 	@classmethod
 	def create_from(cls, loggers):
 		if data_collection_frequency_check(loggers):
-			return cls(loggers = loggers)
-		return cls(loggers = [])
+			return cls(loggers)
+		return cls(None)
 
 		
 	def get_file_name(self):
@@ -158,12 +157,12 @@ class XLSXReport():
 				x_axis_location['min_row'] = row_min 
 				x_axis_location['max_row'] = row_max
 				x_axis_location['min_col'] = start_col
-			y_axis_location = {'min_col':start_col + 2, 'min_row':row_min, 'max_row':row_max}# select data for y-axis
+			y_axis_location = {'min_col':start_col + 2, 'min_row':row_min, 'max_row':row_max}# select temperature data for y-axis
 			
 			for row_idx, data_row in enumerate(usb_logger_data):
 				for column_idx,data_column in enumerate(data_row):
 					if isinstance(data_column, datetime):
-						self._ws.write(row_idx, start_col + column_idx, data_column, date_format)
+						self._ws.write(row_idx, start_col + column_idx, data_column, date_format) #to ensure datetime stamps are written properly in xlsx file
 					else:
 						self._ws.write(row_idx, start_col + column_idx, data_column)
 
@@ -197,31 +196,6 @@ class XLSXReport():
                 })
 		self._ws.insert_chart('A1', chart)
 		self._wb.close()
-
-	# def insert_graph(self):
-	# 	if not self._loggers:
-	# 		return None
-	# 	ws = self.wb[f'{self.file_name}']
-	# 	chart = ScatterChart()
-	# 	chart.title = "Temperature Data"
-	# 	chart.x_axis.title = "Row"
-	# 	chart.y_axis.title = "Temperature (°C)"
-	# 	chart.x_axis.delete = False
-	# 	chart.y_axis.delete = False
-	# 	chart.legend.overlay = False
-		
-		
-	# 	for logger,data_location in self._data_location.items():
-	# 		x_axis_dict = data_location['x_axis_location']
-	# 		y_axis_dict = data_location['y_axis_location']
-	# 		x_values = Reference(ws, min_col=x_axis_dict['min_col'], min_row=x_axis_dict['min_row'], max_row=x_axis_dict['max_row'])
-	# 		y_values = Reference(ws, min_col=y_axis_dict['min_col'], min_row=y_axis_dict['min_row'], max_row=y_axis_dict['max_row'])
-	# 		series = Series(y_values, x_values, title = logger.id)
-	# 		chart.series.append(series)
-	# 	ws.add_chart(chart, "A1")
-	# 	file_path_save = rf'C:\Users\User\Desktop\Misc\{self._file_name}.xlsx'
-	# 	self.wb.save(file_path_save)
-	# 	os.startfile(file_path_save)
 
 	@property
 	def loggers(self):
@@ -292,14 +266,14 @@ def pad_header_with_Nones(header,data_width):
 	return padded_header
 
 def get_data_start_end(logger_data, column_names):
-	#uses column names to extract starting and ending data row indices and adjusts them for openpyxl. Data starts immediately after column names
-	row_min = logger_data.index(column_names) + 2
+	#uses column names to extract starting and ending data row indices and adjusts row_min for xlsxwriter. Data starts immediately after column names
+	row_min = logger_data.index(column_names) + 1
 	row_max = len(logger_data)
 	return row_min, row_max
 
 	
 if __name__ == '__main__':	
-	file_list = [FILE_1,FILE_2,FILE_3,FILE_4, FILE_5,FILE_6,FILE_7,FILE_8]
+	file_list = [FILE_1,FILE_2,FILE_3,FILE_5,FILE_6,FILE_7,FILE_8]
 	usb_loggers = [USBLogger.read_from(file) for file in file_list]
 	report = XLSXReport.create_from(usb_loggers)
 	report.insert_data()
