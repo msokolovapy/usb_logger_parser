@@ -1,12 +1,9 @@
 import os
 from statistics import mean, median
 from datetime import datetime
-from openpyxl import Workbook
-from openpyxl.chart import ScatterChart, Reference, Series, LineChart
-from openpyxl.chart.series import SeriesLabel
-from openpyxl.chart.data_source import StrRef
 from datetime import timedelta
 from collections import Counter
+from xlsxwriter import Workbook
 
 
 FILE_1 = r'N:\GMP Quality Assurance\QA Accessible Documents\Data Logger Downloads\Temperature Mapping\ACPL228\Nov 2025\ACPL149_ACPL228.txt'
@@ -129,8 +126,8 @@ class XLSXReport():
 	def __init__(self, loggers):
 		self._loggers = loggers
 		self._file_name = self.get_file_name()
-		self._wb = Workbook()
-		self._x_axis_column = None
+		self._wb = Workbook(f'{self._file_name}.xlsx')
+		self._ws = self._wb.add_worksheet(self._file_name)
 		self._data_location = {}
 
 	@classmethod
@@ -148,10 +145,9 @@ class XLSXReport():
 	def insert_data(self):
 		if not self._loggers:
 			return None
-		ws = self.wb.active
-		ws.title = self.file_name
 		start_col = 10 #column count starts at 10 to avoid overlapping data with the chart in A1
 		x_axis_location = {'min_col':0, 'min_row':0, 'max_row':0}
+		date_format = self._wb.add_format({'num_format': 'yyyy-mm-dd hh:mm:ss'})
 
 		for usb_logger in self.loggers:
 			usb_logger_data = usb_logger.prepare_for_reporting()
@@ -164,38 +160,68 @@ class XLSXReport():
 				x_axis_location['min_col'] = start_col
 			y_axis_location = {'min_col':start_col + 2, 'min_row':row_min, 'max_row':row_max}# select data for y-axis
 			
-			for row_idx, data_row in enumerate(usb_logger_data, start=1):
+			for row_idx, data_row in enumerate(usb_logger_data):
 				for column_idx,data_column in enumerate(data_row):
-					ws.cell(row=row_idx, column=start_col + column_idx, value = data_column)
+					if isinstance(data_column, datetime):
+						self._ws.write(row_idx, start_col + column_idx, data_column, date_format)
+					else:
+						self._ws.write(row_idx, start_col + column_idx, data_column)
 
 			start_col = start_col + usb_logger.data.data_matrix_size['data_width'] + 1
 			self._data_location[usb_logger] = {'x_axis_location':x_axis_location,'y_axis_location':y_axis_location}
-		return self.wb
-
+	
 	def insert_graph(self):
 		if not self._loggers:
 			return None
-		ws = self.wb[f'{self.file_name}']
-		chart = ScatterChart()
-		chart.title = "Temperature Data"
-		chart.x_axis.title = "Row"
-		chart.y_axis.title = "Temperature (°C)"
-		chart.x_axis.delete = False
-		chart.y_axis.delete = False
-		chart.legend.overlay = False
-		
-		
-		for logger,data_location in self._data_location.items():
+		chart = self._wb.add_chart({'type': 'scatter', 'subtype': 'smooth'})
+		chart.set_title({'name': 'Temperature Data'})
+		chart.set_x_axis({'name': 'Row','position': 'bottom'})
+		chart.set_y_axis({'name': 'Temperature (°C)', 'crossing': 'min'})
+		chart.set_legend({'position': 'right'})
+	
+		for logger, data_location in self._data_location.items():
 			x_axis_dict = data_location['x_axis_location']
 			y_axis_dict = data_location['y_axis_location']
-			x_values = Reference(ws, min_col=x_axis_dict['min_col'], min_row=x_axis_dict['min_row'], max_row=x_axis_dict['max_row'])
-			y_values = Reference(ws, min_col=y_axis_dict['min_col'], min_row=y_axis_dict['min_row'], max_row=y_axis_dict['max_row'])
-			series = Series(y_values, x_values, title = logger.id)
-			chart.series.append(series)
-		ws.add_chart(chart, "A1")
-		file_path_save = rf'C:\Users\User\Desktop\Misc\{self._file_name}.xlsx'
-		self.wb.save(file_path_save)
-		os.startfile(file_path_save)
+			chart.add_series({
+                    'name': logger.id,
+                    'categories': [self.file_name, 
+                                x_axis_dict['min_row'], 
+                                x_axis_dict['min_col'],
+                                x_axis_dict['max_row'], 
+                                x_axis_dict['min_col']],
+                    'values': [self.file_name,
+                            y_axis_dict['min_row'], 
+                            y_axis_dict['min_col'],
+                            y_axis_dict['max_row'], 
+                            y_axis_dict['min_col']],
+                })
+		self._ws.insert_chart('A1', chart)
+		self._wb.close()
+
+	# def insert_graph(self):
+	# 	if not self._loggers:
+	# 		return None
+	# 	ws = self.wb[f'{self.file_name}']
+	# 	chart = ScatterChart()
+	# 	chart.title = "Temperature Data"
+	# 	chart.x_axis.title = "Row"
+	# 	chart.y_axis.title = "Temperature (°C)"
+	# 	chart.x_axis.delete = False
+	# 	chart.y_axis.delete = False
+	# 	chart.legend.overlay = False
+		
+		
+	# 	for logger,data_location in self._data_location.items():
+	# 		x_axis_dict = data_location['x_axis_location']
+	# 		y_axis_dict = data_location['y_axis_location']
+	# 		x_values = Reference(ws, min_col=x_axis_dict['min_col'], min_row=x_axis_dict['min_row'], max_row=x_axis_dict['max_row'])
+	# 		y_values = Reference(ws, min_col=y_axis_dict['min_col'], min_row=y_axis_dict['min_row'], max_row=y_axis_dict['max_row'])
+	# 		series = Series(y_values, x_values, title = logger.id)
+	# 		chart.series.append(series)
+	# 	ws.add_chart(chart, "A1")
+	# 	file_path_save = rf'C:\Users\User\Desktop\Misc\{self._file_name}.xlsx'
+	# 	self.wb.save(file_path_save)
+	# 	os.startfile(file_path_save)
 
 	@property
 	def loggers(self):
@@ -273,8 +299,7 @@ def get_data_start_end(logger_data, column_names):
 
 	
 if __name__ == '__main__':	
-	file_list = [FILE_1,FILE_2,FILE_3,FILE_5,FILE_6,FILE_7,FILE_8]
-	# file_list = [FILE_1]
+	file_list = [FILE_1,FILE_2,FILE_3,FILE_4, FILE_5,FILE_6,FILE_7,FILE_8]
 	usb_loggers = [USBLogger.read_from(file) for file in file_list]
 	report = XLSXReport.create_from(usb_loggers)
 	report.insert_data()
