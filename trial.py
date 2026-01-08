@@ -2,7 +2,9 @@ import os
 from statistics import mean, median
 from datetime import datetime
 from openpyxl import Workbook
-from openpyxl.chart import ScatterChart, Reference, Series
+from openpyxl.chart import ScatterChart, Reference, Series, LineChart
+from openpyxl.chart.series import SeriesLabel
+from openpyxl.chart.data_source import StrRef
 from datetime import timedelta
 from collections import Counter
 
@@ -129,7 +131,7 @@ class XLSXReport():
 		self._file_name = self.get_file_name()
 		self._wb = Workbook()
 		self._x_axis_column = None
-		self._data_location = []
+		self._data_location = {}
 
 	@classmethod
 	def create_from(cls, loggers):
@@ -167,7 +169,7 @@ class XLSXReport():
 					ws.cell(row=row_idx, column=start_col + column_idx, value = data_column)
 
 			start_col = start_col + usb_logger.data.data_matrix_size['data_width'] + 1
-			self._data_location.append({usb_logger:{'x_axis_location':x_axis_location,'y_axis_location':y_axis_location}})
+			self._data_location[usb_logger] = {'x_axis_location':x_axis_location,'y_axis_location':y_axis_location}
 		return self.wb
 
 	def insert_graph(self):
@@ -182,24 +184,18 @@ class XLSXReport():
 		chart.y_axis.delete = False
 		chart.legend.overlay = False
 		
-		for data_location_dict in self._data_location: #data_location_dict is a list of nested dictionaries
-			for logger,data_location in data_location_dict.items():
-				x_axis_dict = data_location['x_axis_location']
-				y_axis_dict = data_location['y_axis_location']
-				x_values = Reference(ws, min_col=x_axis_dict['min_col'], min_row=x_axis_dict['min_row'], max_row=x_axis_dict['max_row'])
-				y_values = Reference(ws, min_col=y_axis_dict['min_col'], min_row=y_axis_dict['min_row'], max_row=y_axis_dict['max_row'])
-				series = Series(y_values, x_values, title = logger.id)
-				chart.series.append(series)
+		
+		for logger,data_location in self._data_location.items():
+			x_axis_dict = data_location['x_axis_location']
+			y_axis_dict = data_location['y_axis_location']
+			x_values = Reference(ws, min_col=x_axis_dict['min_col'], min_row=x_axis_dict['min_row'], max_row=x_axis_dict['max_row'])
+			y_values = Reference(ws, min_col=y_axis_dict['min_col'], min_row=y_axis_dict['min_row'], max_row=y_axis_dict['max_row'])
+			series = Series(y_values, x_values, title = logger.id)
+			chart.series.append(series)
 		ws.add_chart(chart, "A1")
 		file_path_save = rf'C:\Users\User\Desktop\Misc\{self._file_name}.xlsx'
 		self.wb.save(file_path_save)
 		os.startfile(file_path_save)
-
-	
-	# def determine_max_row_value(self):
-	# 		max_row_value = max(len(logger.data.original_data) for logger in self.loggers)
-	# 		return max_row_value
-		
 
 	@property
 	def loggers(self):
@@ -217,7 +213,6 @@ class XLSXReport():
 	
 #___________________________________________________________________________________________________________________
 #	HELPER FUNCTIONS BELOW:
-
 
 def data_collection_frequency_check(usb_loggers):
 	frequencies = [logger.data.data_coll_freq for logger in usb_loggers]
@@ -259,32 +254,6 @@ def obtain_logger_id_from(header):
 	return id, serial_no_idx
 
 
-# def create_print_statement(diff_data):
-# 	#formats differences in two data sets to enable easy reading in terminal window
-# 	if not diff_data:
-# 		print('Two temperature data sets are identical')
-# 	else:
-# 		i = len(diff_data)
-# 		j = min(20,i) #max 20 different data points to display in terminal for ease of reading
-# 		trunc_diff_data = diff_data[:j]		
-# 		print(f'There are {i} different data point/s found between two temperature data sets.\nOnly first {j} data point/s are shown: \nPosition|Data set 1|Data set 2')
-# 		for row in trunc_diff_data:
-# 			index, data1, data2 = row
-# 			formatted_data = f'{index:^8}|{str(data1):^10}|{str(data2):^10}'
-# 			print(formatted_data)
-
-
-# @property
-# def data_coll_freq_identical(loggers):
-# 	if len(set(loggers.data)) == 1:
-# 		return True
-# 	else:
-# 		logger_ids = [logger.id for logger in set(loggers)]
-# 		string_to_display = ', '.join(logger_ids)
-# 		print(f'The following usb loggers have different data collection frequencies: {string_to_display}. \
-# 				Try again by choosing usb loggers with identical data collection frequency to \
-# 				ensure meaningful data comparison')
-
 def pad_header_with_Nones(header,data_width):
 	number_Nones = data_width - 1
 	padded_header = []
@@ -304,8 +273,8 @@ def get_data_start_end(logger_data, column_names):
 
 	
 if __name__ == '__main__':	
-	# file_list = [FILE_1,FILE_2,FILE_3,FILE_5,FILE_6,FILE_7,FILE_8]
-	file_list = [FILE_1]
+	file_list = [FILE_1,FILE_2,FILE_3,FILE_5,FILE_6,FILE_7,FILE_8]
+	# file_list = [FILE_1]
 	usb_loggers = [USBLogger.read_from(file) for file in file_list]
 	report = XLSXReport.create_from(usb_loggers)
 	report.insert_data()
