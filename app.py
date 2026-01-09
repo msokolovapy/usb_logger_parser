@@ -19,11 +19,13 @@ FILE_8 = r'N:\GMP Quality Assurance\QA Accessible Documents\Data Logger Download
 class TemperatureData():
 	"""This class stores temperature data obtained via Lascar USB data logger"""
 	def __init__(self, temperature_data):
-		self._original_data = temperature_data #list of (row_number, date_time_stamp, degrees_celsius) tuples
+		self._original_data = temperature_data 
 		self._max = self.select_max_temperature()
 		self._min = self.select_min_temperature()
 		self._average = self.select_average_temperature()
 		self._median = self.select_median_temperature()
+		self._low_alarm = None
+		self._high_alarm = None
 		self._data_coll_freq = self.determine_ave_data_coll_frequency()
 		self._data_matrix_size = {'data_width':len(self._original_data[0]),	'data_lenth':len(self._original_data)}
 
@@ -47,6 +49,13 @@ class TemperatureData():
 			if prev_timestamp is not None:
 				yield row['date_time'] - prev_timestamp
 			prev_timestamp = row['date_time']
+
+	def add_low_high_alarms(self, storage_condition):
+		try:
+			self._low_alarm = Alarms.low_alarms[storage_condition]
+			self._high_alarm = Alarms.high_alarms[storage_condition]
+		except KeyError:
+			raise
 	
 
 	@property
@@ -70,21 +79,29 @@ class TemperatureData():
 	@property
 	def data_coll_freq(self):
 		return self._data_coll_freq
+	@property
+	def high_alarm(self):
+		return self._high_alarm
+	@property
+	def low_alarm(self):
+		return self._low_alarm
 
 
 class USBLogger():
-	def __init__(self, logger_id, serial_no, data):
+	def __init__(self, logger_id, serial_no, data, file_basename):
 		self._data = TemperatureData(data)
 		self._id = logger_id
 		self._serial_number = serial_no
+		self._file_basename = file_basename
 	
 	@classmethod
 	def read_from(cls,file_path):
 		file_contents = open(file_path)
+		file_basename = os.path.basename(file_path)
 		header = next(file_contents)
 		logger_id, serial_no_idx = obtain_logger_id_from(header)
 		serial_no, temperature_data = obtain_serial_numb_temps_from(file_contents, serial_no_idx)
-		return cls(logger_id,serial_no,temperature_data)
+		return cls(logger_id,serial_no,temperature_data, file_basename)
 
 	def prepare_for_reporting(self):
 		#inserts additional data fields to the temp data for better readability when using xlsx report
@@ -109,6 +126,13 @@ class USBLogger():
 		header = [self._id, self._serial_number] #logger metadata allows easy logger data identification when multiple logger data traces are overlayed in xlsx report
 		padded_header = pad_header_with_Nones(header,data_width)
 		return padded_header
+	
+	def check_low_high_alarms(self):
+		storage_condition = input(f'Please specify which storage conditions this logger "{self._file_basename}" was used to monitor? Enter either C (cold storage, hplc fridge), or FI (fridge), or FZ (freezer), or 25C (25°C), or 50C (50°C): ')
+		try:
+			self._data.add_low_high_alarms(storage_condition)
+		except KeyError:
+			print(f'Storage condition "{storage_condition}" is not in Alarms dictionary. Correct and try again.')
 	
 	@property
 	def data(self):
@@ -135,12 +159,10 @@ class XLSXReport():
 			return cls(loggers)
 		return cls(None)
 
-		
 	def get_file_name(self):
 		formatted_today = datetime.now().strftime('%Y-%m-%d')
 		return f'{formatted_today}_usb_data_loggers'
 	
-
 	def insert_data(self):
 		if not self._loggers:
 			return None
@@ -210,7 +232,9 @@ class XLSXReport():
 	def data_frequency_check(self):
 		return self.data_frequency_check()
 
-	
+class Alarms():
+	low_alarms = {'C': -20.0, 'FI': 0.0, 'FZ': -30.0, '25C': 15.0, '50C':25.0}
+	high_alarms = {'C': 20.0, 'FI': 15.0, 'FZ': -0.1, '25C': 30.0, '50C':60.0}
 #___________________________________________________________________________________________________________________
 #	HELPER FUNCTIONS BELOW:
 
@@ -273,8 +297,13 @@ def get_data_start_end(logger_data, column_names):
 
 	
 if __name__ == '__main__':	
-	file_list = [FILE_1,FILE_2,FILE_3,FILE_5,FILE_6,FILE_7,FILE_8]
+	# file_list = [FILE_1,FILE_2,FILE_3,FILE_5,FILE_6,FILE_7,FILE_8]
+	file_list = [FILE_4]
 	usb_loggers = [USBLogger.read_from(file) for file in file_list]
-	report = XLSXReport.create_from(usb_loggers)
-	report.insert_data()
-	report.insert_graph()
+	for logger in usb_loggers:
+		logger.check_low_high_alarms()
+		print(logger.data.low_alarm, logger.data.high_alarm)
+
+	# report = XLSXReport.create_from(usb_loggers)
+	# report.insert_data()
+	# report.insert_graph(
