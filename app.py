@@ -1,5 +1,6 @@
 import os
 from statistics import mean, median
+from collections import defaultdict
 from datetime import datetime
 from datetime import timedelta
 from collections import Counter
@@ -28,6 +29,8 @@ class TemperatureData():
 		self._high_alarm = None
 		self._data_coll_freq = self.determine_ave_data_coll_frequency()
 		self._data_matrix_size = {'data_width':len(self._original_data[0]),	'data_lenth':len(self._original_data)}
+		self._spikes = defaultdict(lambda: defaultdict(list))
+		self._anomalous_spikes = {}
 
 	def select_max_temperature(self):
 		return (max(row['celsius'] for row in self.original_data))
@@ -56,6 +59,88 @@ class TemperatureData():
 			self._high_alarm = Alarms.high_alarms[storage_condition]
 		except KeyError:
 			raise
+
+
+	def _extract_temps_for_(self,date):
+		try:
+			extracted_temps = []
+			for data_dict in self._original_data:
+				if data_dict['date_time'].date() == date:
+					extracted_temps.append(data_dict)
+			return extracted_temps
+		except Exception as e:
+			return None
+	
+	def _extract_temp_spikes_for_(self, date):
+		"""Prepares a dictionary of grouped data (date_time and Celsius reading) for each spike found"""	
+		data = self._extract_temps_for_(date)
+		spikes = defaultdict(lambda: defaultdict(list))
+		spike_no = 0
+		spike_flag = None
+
+		if data:
+			try:
+				for data_dict in data:
+					if self._low_alarm <= data_dict['celsius'] <= self._high_alarm:
+						spike_flag = False
+					else:
+						if not spike_flag:	#checks if current spike data point belongs to next spike group
+							spike_flag = True
+							spike_no = spike_no + 1 
+						spikes[date][spike_no].append((data_dict['date_time'],data_dict['celsius']))					
+				return spikes
+			except Exception as e:
+				return None
+		else:
+			return None
+	
+	def prepare_spike_dict_(self):
+		date = input('Enter date for which spike/MKT analysis needs to be performed (note date format: dd-mm-yyyy):' )
+		try:
+			formatted_date = datetime.strptime(date,'%d-%m-%Y').date()
+		except ValueError:
+			print(f'You entered {date}. Ensure your entered date follows dd-mm-yyyy format and try again')
+
+		if not date in self._spikes:
+			spikes = self._extract_temp_spikes_for_(formatted_date)
+			if spikes:
+				total_spikes_duration = 0
+
+				for spike_no, data_list in spikes[date]:
+					spike_temps = [celsius for (_,celsius) in data_list]
+					print(spike_temps)
+					spike_dates_times = [date_time for (date_time,_) in data_list]
+					print(spike_dates_times)
+		
+					if all(temp < self._low_alarm for temp in spike_temps):
+						spike_temp = min(spike_temps)
+					if all(temp > self._high_alarm for temp in spike_temps):
+						spike_temp = max(spike_temps)
+					else:
+						self._anomalous_spikes[spike_no] = data_list
+						print(f'For spike {spike_no} a change in temperature sign was observed. This spike will be omitted from analysis')
+						continue
+					spike_date_time = [date for (date,celsius) in data_list if celsius == spike_temp][0]
+					spike_duration = spike_dates_times[0] - spike_dates_times[-1]
+					total_spikes_duration += spike_duration
+					self._spikes[date].append({'spike_no': spike_no, 'extreme_spike_temp':spike_temp,'extreme_date_time': spike_date_time, 'spike_duration': spike_duration})
+				self._spikes[date]['total_spikes_duration'] = total_spikes_duration
+				return self._spikes[date]
+			else:
+				return None
+		return self._spikes[date]
+
+# def analyze_spikes_(self, date):
+# 	spike_dict = self.prepare_spike_dict_from_(date)
+# 	if spike_dict:
+# 		total_spikes_duration = self.determine_total_spikes_duration
+# 		if total_spikes_duration > Limits.total_spikes_duration:
+# 			print(f'Total duration of temperature spikes on {date} was {spike_dict['total_spikes_duration']} hours')
+
+# 		for (spike_no, spike_temp, spike_date_time, spike_duration) in self.get_indiv_spikes_over_limit():
+# 			print(f'Individual spike of {spike_duration} mins was observed at {spike_date_time} equaling {spike_temp} Celsius')
+		
+# 		self._spikes['date'].append('MKT': self.prepare_MKT(date))
 	
 
 	@property
@@ -298,11 +383,13 @@ def get_data_start_end(logger_data, column_names):
 	
 if __name__ == '__main__':	
 	# file_list = [FILE_1,FILE_2,FILE_3,FILE_5,FILE_6,FILE_7,FILE_8]
-	file_list = [FILE_4]
+	SPIKE_FILE = r'C:\Users\User\Desktop\Misc\usb_logger_parser\ACP169_30-03-2020_artificial_spikes.txt'
+	file_list = [SPIKE_FILE]
 	usb_loggers = [USBLogger.read_from(file) for file in file_list]
 	for logger in usb_loggers:
 		logger.check_low_high_alarms()
-		print(logger.data.low_alarm, logger.data.high_alarm)
+		logger.data.prepare_spike_dict_()
+		print(logger.data._spikes)
 
 	# report = XLSXReport.create_from(usb_loggers)
 	# report.insert_data()
