@@ -104,9 +104,9 @@ class TemperatureData():
 		if not date in self._spikes:
 			spikes = self._extract_temp_spikes_for_(formatted_date)
 			if spikes:
-				total_spikes_duration = 0
+				total_spikes_duration = timedelta(hours=0, minutes=0, seconds=0)
 
-				for spike_no, data_list in spikes[date]:
+				for spike_no, data_list in spikes[formatted_date].items():
 					spike_temps = [celsius for (_,celsius) in data_list]
 					print(spike_temps)
 					spike_dates_times = [date_time for (date_time,_) in data_list]
@@ -123,7 +123,7 @@ class TemperatureData():
 					spike_date_time = [date for (date,celsius) in data_list if celsius == spike_temp][0]
 					spike_duration = spike_dates_times[0] - spike_dates_times[-1]
 					total_spikes_duration += spike_duration
-					self._spikes[date].append({'spike_no': spike_no, 'extreme_spike_temp':spike_temp,'extreme_date_time': spike_date_time, 'spike_duration': spike_duration})
+					self._spikes[date]['individual_spikes'].append({'spike_no': spike_no, 'extreme_spike_temp':spike_temp,'extreme_date_time': spike_date_time, 'spike_duration': spike_duration})
 				self._spikes[date]['total_spikes_duration'] = total_spikes_duration
 				return self._spikes[date]
 			else:
