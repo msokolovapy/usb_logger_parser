@@ -1,7 +1,8 @@
 import os
 from statistics import mean, median
+import math
 from collections import defaultdict
-from datetime import datetime
+from datetime import datetime, date
 from datetime import timedelta
 from collections import Counter
 from xlsxwriter import Workbook
@@ -27,6 +28,7 @@ class TemperatureData():
 		self._median = self.select_median_temperature()
 		self._low_alarm = None
 		self._high_alarm = None
+		self._storage_condition = None
 		self._data_coll_freq = self.determine_ave_data_coll_frequency()
 		self._data_matrix_size = {'data_width':len(self._original_data[0]),	'data_lenth':len(self._original_data)}
 		self._spikes = defaultdict(lambda: defaultdict(list))
@@ -142,6 +144,16 @@ class TemperatureData():
 		
 # 		self._spikes['date'].append('MKT': self.prepare_MKT(date))
 	
+	def _calculate_daily_MKT_for_(self,formatted_date, delta_h=83.144):
+		#calculates daily Mean Kinetic Temperature (MKT)
+		daily_data = self._extract_temps_for_(formatted_date)
+		temps = [dict['celsius'] for dict in daily_data]
+		R = 0.008314
+		temps_k = [t + 273.15 for t in temps]
+		n = len(temps_k)
+		sum_exp = sum(math.exp(-delta_h / (R * t)) for t in temps_k)
+		mkt_k = - delta_h / (R * math.log(sum_exp / n))
+		return round(mkt_k - 273.15,2)
 
 	@property
 	def original_data(self):
@@ -216,6 +228,7 @@ class USBLogger():
 		storage_condition = input(f'Please specify which storage conditions this logger "{self._file_basename}" was used to monitor? Enter either C (cold storage, hplc fridge), or FI (fridge), or FZ (freezer), or 25C (25°C), or 50C (50°C): ')
 		try:
 			self._data.add_low_high_alarms(storage_condition)
+			self._data._storage_condition = storage_condition
 		except KeyError:
 			print(f'Storage condition "{storage_condition}" is not in Alarms dictionary. Correct and try again.')
 	
@@ -318,8 +331,16 @@ class XLSXReport():
 		return self.data_frequency_check()
 
 class Alarms():
-	low_alarms = {'C': -20.0, 'FI': 0.0, 'FZ': -30.0, '25C': 15.0, '50C':25.0}
-	high_alarms = {'C': 20.0, 'FI': 15.0, 'FZ': -0.1, '25C': 30.0, '50C':60.0}
+	low_alarms = {'C': -10.0, 'FI': 2.0, 'FZ': -25.0, '25C': 24.0, '50C':45.0}
+	high_alarms = {'C': 10.0, 'FI': 8.0, 'FZ': -15.0, '25C': 26.0, '50C':55.0}
+
+class Limits():
+	limits = {'C': {'low_alert': -20.0, 'high_alert':-20.0, 'single_spike_duration':3600, 'total_spike_duration': 10800},
+		   	'FI': {'low_alert': 0.0, 'high_alert': 15.0, 'single_spike_duration':3600, 'total_spike_duration':10800},
+			'FZ': {'low_alert': -30.0, 'high_alert': -0.1, 'single_spike_duration':3600, 'total_spike_duration':10800},
+			'25C': {'low_alert': 15.0, 'high_alert': 30.0, 'single_spike_duration':900, 'total_spike_duration':10800},
+			'50C': {'low_alert': 25.0, 'high_alert': 60.0, 'single_spike_duration':900, 'total_spike_duration':10800}
+	}
 #___________________________________________________________________________________________________________________
 #	HELPER FUNCTIONS BELOW:
 
@@ -387,10 +408,11 @@ if __name__ == '__main__':
 	file_list = [SPIKE_FILE]
 	usb_loggers = [USBLogger.read_from(file) for file in file_list]
 	for logger in usb_loggers:
-		logger.check_low_high_alarms()
-		logger.data.prepare_spike_dict_()
-		print(f'Spikes dict is {logger.data._spikes}')
-		
+		# logger.check_low_high_alarms()
+		# logger.data.prepare_spike_dict_()
+		# print(logger.data._spikes)
+		mkt = logger.data._calculate_daily_MKT_for_(date(2020, 3, 16))
+		print(mkt)
 
 	# report = XLSXReport.create_from(usb_loggers)
 	# report.insert_data()
