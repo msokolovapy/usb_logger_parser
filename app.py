@@ -30,7 +30,7 @@ class TemperatureData():
 		self._data_coll_freq = self.determine_ave_data_coll_frequency()
 		self._data_matrix_size = {'data_width':len(self._original_data[0]),	'data_lenth':len(self._original_data)}
 		self._spikes = defaultdict(lambda: defaultdict(list))
-		self._anomalous_spikes = {}
+		self._anomalous_spikes = defaultdict(lambda: defaultdict(list))
 
 	def select_max_temperature(self):
 		return (max(row['celsius'] for row in self.original_data))
@@ -87,7 +87,8 @@ class TemperatureData():
 						if not spike_flag:	#checks if current spike data point belongs to next spike group
 							spike_flag = True
 							spike_no = spike_no + 1 
-						spikes[date][spike_no].append((data_dict['date_time'],data_dict['celsius']))					
+						spikes[date][spike_no].append((data_dict['date_time'],data_dict['celsius']))
+				spikes = {k:dict(v) for k,v in spikes.items()} #turn to regular dictionary for easy viewing
 				return spikes
 			except Exception as e:
 				return None
@@ -101,34 +102,33 @@ class TemperatureData():
 		except ValueError:
 			print(f'You entered {date}. Ensure your entered date follows dd-mm-yyyy format and try again')
 
-		if not date in self._spikes:
+		if not formatted_date in self._spikes:
 			spikes = self._extract_temp_spikes_for_(formatted_date)
 			if spikes:
 				total_spikes_duration = timedelta(hours=0, minutes=0, seconds=0)
 
 				for spike_no, data_list in spikes[formatted_date].items():
 					spike_temps = [celsius for (_,celsius) in data_list]
-					print(spike_temps)
 					spike_dates_times = [date_time for (date_time,_) in data_list]
-					print(spike_dates_times)
 		
 					if all(temp < self._low_alarm for temp in spike_temps):
 						spike_temp = min(spike_temps)
-					if all(temp > self._high_alarm for temp in spike_temps):
+					elif all(temp > self._high_alarm for temp in spike_temps):
 						spike_temp = max(spike_temps)
 					else:
-						self._anomalous_spikes[spike_no] = data_list
+						self._anomalous_spikes[formatted_date][spike_no].append(data_list)
 						print(f'For spike {spike_no} a change in temperature sign was observed. This spike will be omitted from analysis')
 						continue
 					spike_date_time = [date for (date,celsius) in data_list if celsius == spike_temp][0]
-					spike_duration = spike_dates_times[0] - spike_dates_times[-1]
+					spike_duration = spike_dates_times[-1] - spike_dates_times[0]
 					total_spikes_duration += spike_duration
-					self._spikes[date]['individual_spikes'].append({'spike_no': spike_no, 'extreme_spike_temp':spike_temp,'extreme_date_time': spike_date_time, 'spike_duration': spike_duration})
-				self._spikes[date]['total_spikes_duration'] = total_spikes_duration
-				return self._spikes[date]
+					self._spikes[formatted_date]['individual_spikes'].append({'spike_no': spike_no, 'extreme_spike_temp':spike_temp,'extreme_date_time': spike_date_time, 'spike_duration': spike_duration})
+				self._spikes[formatted_date]['total_spikes_duration'] = total_spikes_duration
+				self._spikes = {k:dict(v) for k,v in self._spikes.items()} #turn to regular dictionary for easy viewing
+				return self._spikes[formatted_date]
 			else:
 				return None
-		return self._spikes[date]
+		return self._spikes[formatted_date]
 
 # def analyze_spikes_(self, date):
 # 	spike_dict = self.prepare_spike_dict_from_(date)
@@ -389,7 +389,8 @@ if __name__ == '__main__':
 	for logger in usb_loggers:
 		logger.check_low_high_alarms()
 		logger.data.prepare_spike_dict_()
-		print(logger.data._spikes)
+		print(f'Spikes dict is {logger.data._spikes}')
+		
 
 	# report = XLSXReport.create_from(usb_loggers)
 	# report.insert_data()
