@@ -20,15 +20,16 @@ FILE_8 = r'N:\GMP Quality Assurance\QA Accessible Documents\Data Logger Download
 	
 class TemperatureData():
 	"""This class stores temperature data obtained via Lascar USB data logger"""
-	def __init__(self, temperature_data):
+	def __init__(self, temperature_data, owner = None):
 		self._original_data = temperature_data 
+		self._owner = owner
 		self._max = self.select_max_temperature()
 		self._min = self.select_min_temperature()
 		self._average = self.select_average_temperature()
 		self._median = self.select_median_temperature()
-		self._low_alarm = None
-		self._high_alarm = None
-		self._storage_condition = None
+		# self._low_alarm = None
+		# self._high_alarm = None
+		# self._storage_condition = None
 		self._data_coll_freq = self.determine_ave_data_coll_frequency()
 		self._data_matrix_size = {'data_width':len(self._original_data[0]),	'data_lenth':len(self._original_data)}
 		self._spikes = defaultdict(lambda: defaultdict(list))
@@ -55,12 +56,12 @@ class TemperatureData():
 				yield row['date_time'] - prev_timestamp
 			prev_timestamp = row['date_time']
 
-	def add_low_high_alarms(self, storage_condition):
-		try:
-			self._low_alarm = Alarms.low_alarms[storage_condition]
-			self._high_alarm = Alarms.high_alarms[storage_condition]
-		except KeyError:
-			raise
+	# def add_low_high_alarms(self, storage_condition):
+	# 	try:
+	# 		self._low_alarm = Alarms.low_alarms[storage_condition]
+	# 		self._high_alarm = Alarms.high_alarms[storage_condition]
+	# 	except KeyError:
+	# 		raise
 
 
 	def _extract_temps_for_(self,date):
@@ -83,7 +84,7 @@ class TemperatureData():
 		if data:
 			try:
 				for data_dict in data:
-					if self._low_alarm <= data_dict['celsius'] <= self._high_alarm:
+					if Limits <= data_dict['celsius'] <= self._high_alarm:
 						spike_flag = False
 					else:
 						if not spike_flag:	#checks if current spike data point belongs to next spike group
@@ -135,14 +136,16 @@ class TemperatureData():
 # def analyze_spikes_(self, date):
 # 	spike_dict = self.prepare_spike_dict_from_(date)
 # 	if spike_dict:
-# 		total_spikes_duration = self.determine_total_spikes_duration
-# 		if total_spikes_duration > Limits.total_spikes_duration:
-# 			print(f'Total duration of temperature spikes on {date} was {spike_dict['total_spikes_duration']} hours')
+# 		for spike_no, spike_info in spike_dict[date]['individual_spikes'].items():
+# 			if spike_info['single_spike_duration'] > Limits.limits[self._storage_condition]['single_spike_duration']:
+# 				print(f'Individual spike of {spike_info['spike_duration']} mins was observed at {spike_info['extreme_date_time']}')
+# 			if spike_dict['extreme_spike_temp'] > Limits.limits[self._storage_condition]['high_alert'] or if spike_dict['extreme_spike_temp'] < Limits.limits[self._storage_condition]['low_alert']:
+# 				print(f'Individual spike equalling {spike_info['extreme_spike_temp']} Celsius was observed at {spike_info['extreme_date_time']} ')
+# 		if spike_dict['total_spikes_duration'] > Limits.limits[self._storage_condition]['total_spike_duration']:
+# 			print(f'Total duration of temperature spikes on {date} was {spike_dict['total_spikes_duration']} mins')
 
-# 		for (spike_no, spike_temp, spike_date_time, spike_duration) in self.get_indiv_spikes_over_limit():
-# 			print(f'Individual spike of {spike_duration} mins was observed at {spike_date_time} equaling {spike_temp} Celsius')
-		
-# 		self._spikes['date'].append('MKT': self.prepare_MKT(date))
+# 		if not total_spike_duration_acceptable() or if not single_spike_duration_acceptable() or if not extreme_spike_temperature_acceptable():
+# 			self._calculate_daily_MKT_for_(date)
 	
 	def _calculate_daily_MKT_for_(self,formatted_date, delta_h=83.144):
 		#calculates daily Mean Kinetic Temperature (MKT)
@@ -186,10 +189,11 @@ class TemperatureData():
 
 class USBLogger():
 	def __init__(self, logger_id, serial_no, data, file_basename):
-		self._data = TemperatureData(data)
+		self._data = TemperatureData(data, owner = self)
 		self._id = logger_id
 		self._serial_number = serial_no
 		self._file_basename = file_basename
+		self._storage_condition = self._check_storage_condition()
 	
 	@classmethod
 	def read_from(cls,file_path):
@@ -199,6 +203,19 @@ class USBLogger():
 		logger_id, serial_no_idx = obtain_logger_id_from(header)
 		serial_no, temperature_data = obtain_serial_numb_temps_from(file_contents, serial_no_idx)
 		return cls(logger_id,serial_no,temperature_data, file_basename)
+	
+	# @classmethod
+	# def check_low_high_alarms(cls):
+	# 	storage_condition = input(f'Please specify which storage conditions this logger "{self._file_basename}" was used to monitor? Enter either C (cold storage, hplc fridge), or FI (fridge), or FZ (freezer), or 25C (25°C), or 50C (50°C): ')
+	# 	return storage_condition
+		
+	# 	try:
+	# 		self._data.add_low_high_alarms(storage_condition)
+	# 		self._data._storage_condition = storage_condition
+	# 	except KeyError:
+	# 		print(f'Storage condition "{storage_condition}" is not in Alarms dictionary. Correct and try again.')
+	
+
 
 	def prepare_for_reporting(self):
 		#inserts additional data fields to the temp data for better readability when using xlsx report
@@ -224,13 +241,17 @@ class USBLogger():
 		padded_header = pad_header_with_Nones(header,data_width)
 		return padded_header
 	
-	def check_low_high_alarms(self):
+	def _check_storage_condition(self):
 		storage_condition = input(f'Please specify which storage conditions this logger "{self._file_basename}" was used to monitor? Enter either C (cold storage, hplc fridge), or FI (fridge), or FZ (freezer), or 25C (25°C), or 50C (50°C): ')
-		try:
-			self._data.add_low_high_alarms(storage_condition)
-			self._data._storage_condition = storage_condition
-		except KeyError:
-			print(f'Storage condition "{storage_condition}" is not in Alarms dictionary. Correct and try again.')
+		return storage_condition
+	
+	# def check_low_high_alarms(self):
+	# 	storage_condition = input(f'Please specify which storage conditions this logger "{self._file_basename}" was used to monitor? Enter either C (cold storage, hplc fridge), or FI (fridge), or FZ (freezer), or 25C (25°C), or 50C (50°C): ')
+	# 	try:
+	# 		self._data.add_low_high_alarms(storage_condition)
+	# 		self._data._storage_condition = storage_condition
+	# 	except KeyError:
+	# 		print(f'Storage condition "{storage_condition}" is not in Alarms dictionary. Correct and try again.')
 	
 	@property
 	def data(self):
@@ -330,16 +351,12 @@ class XLSXReport():
 	def data_frequency_check(self):
 		return self.data_frequency_check()
 
-class Alarms():
-	low_alarms = {'C': -10.0, 'FI': 2.0, 'FZ': -25.0, '25C': 24.0, '50C':45.0}
-	high_alarms = {'C': 10.0, 'FI': 8.0, 'FZ': -15.0, '25C': 26.0, '50C':55.0}
-
 class Limits():
-	limits = {'C': {'low_alert': -20.0, 'high_alert':-20.0, 'single_spike_duration':3600, 'total_spike_duration': 10800},
-		   	'FI': {'low_alert': 0.0, 'high_alert': 15.0, 'single_spike_duration':3600, 'total_spike_duration':10800},
-			'FZ': {'low_alert': -30.0, 'high_alert': -0.1, 'single_spike_duration':3600, 'total_spike_duration':10800},
-			'25C': {'low_alert': 15.0, 'high_alert': 30.0, 'single_spike_duration':900, 'total_spike_duration':10800},
-			'50C': {'low_alert': 25.0, 'high_alert': 60.0, 'single_spike_duration':900, 'total_spike_duration':10800}
+	limits = {'C': {'low_alarm': -10.0, 'high_alarm': 10.0, 'low_alert': -20.0, 'high_alert':-20.0, 'single_spike_duration':3600, 'total_spike_duration': 10800},
+		   	'FI': {'low_alarm': 2.0, 'high_alarm': 8.0,'low_alert': 0.0, 'high_alert': 15.0, 'single_spike_duration':3600, 'total_spike_duration':10800},
+			'FZ': {'low_alarm': -25.0, 'high_alarm': -15.0,'low_alert': -30.0, 'high_alert': -0.1, 'single_spike_duration':3600, 'total_spike_duration':10800},
+			'25C': {'low_alarm': 24.0, 'high_alarm': 26.0,'low_alert': 15.0, 'high_alert': 30.0, 'single_spike_duration':900, 'total_spike_duration':10800},
+			'50C': {'low_alarm': 45.0, 'high_alarm': 55.0,'low_alert': 25.0, 'high_alert': 60.0, 'single_spike_duration':900, 'total_spike_duration':10800}
 	}
 #___________________________________________________________________________________________________________________
 #	HELPER FUNCTIONS BELOW:
