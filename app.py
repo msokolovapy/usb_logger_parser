@@ -27,9 +27,6 @@ class TemperatureData():
 		self._min = self.select_min_temperature()
 		self._average = self.select_average_temperature()
 		self._median = self.select_median_temperature()
-		# self._low_alarm = None
-		# self._high_alarm = None
-		# self._storage_condition = None
 		self._data_coll_freq = self.determine_ave_data_coll_frequency()
 		self._data_matrix_size = {'data_width':len(self._original_data[0]),	'data_lenth':len(self._original_data)}
 		self._spikes = defaultdict(lambda: defaultdict(list))
@@ -56,14 +53,6 @@ class TemperatureData():
 				yield row['date_time'] - prev_timestamp
 			prev_timestamp = row['date_time']
 
-	# def add_low_high_alarms(self, storage_condition):
-	# 	try:
-	# 		self._low_alarm = Alarms.low_alarms[storage_condition]
-	# 		self._high_alarm = Alarms.high_alarms[storage_condition]
-	# 	except KeyError:
-	# 		raise
-
-
 	def _extract_temps_for_(self,date):
 		try:
 			extracted_temps = []
@@ -80,18 +69,20 @@ class TemperatureData():
 		spikes = defaultdict(lambda: defaultdict(list))
 		spike_no = 0
 		spike_flag = None
+		low_alert = Limits.limits[self._owner._storage_condition]['low_alert']
+		high_alert = Limits.limits[self._owner._storage_condition]['high_alert']
 
 		if data:
 			try:
 				for data_dict in data:
-					if Limits <= data_dict['celsius'] <= self._high_alarm:
+					if low_alert  <= data_dict['celsius'] <= high_alert:
 						spike_flag = False
 					else:
 						if not spike_flag:	#checks if current spike data point belongs to next spike group
 							spike_flag = True
 							spike_no = spike_no + 1 
 						spikes[date][spike_no].append((data_dict['date_time'],data_dict['celsius']))
-				spikes = {k:dict(v) for k,v in spikes.items()} #turn to regular dictionary for easy viewing
+				spikes = {k:dict(v) for k,v in spikes.items()} #turn to regular dictionary for easy viewing in terminal
 				return spikes
 			except Exception as e:
 				return None
@@ -105,6 +96,9 @@ class TemperatureData():
 		except ValueError:
 			print(f'You entered {date}. Ensure your entered date follows dd-mm-yyyy format and try again')
 
+		low_alert = Limits.limits[self._owner._storage_condition]['low_alert']
+		high_alert = Limits.limits[self._owner._storage_condition]['high_alert']
+
 		if not formatted_date in self._spikes:
 			spikes = self._extract_temp_spikes_for_(formatted_date)
 			if spikes:
@@ -114,9 +108,9 @@ class TemperatureData():
 					spike_temps = [celsius for (_,celsius) in data_list]
 					spike_dates_times = [date_time for (date_time,_) in data_list]
 		
-					if all(temp < self._low_alarm for temp in spike_temps):
+					if all(temp < low_alert for temp in spike_temps):
 						spike_temp = min(spike_temps)
-					elif all(temp > self._high_alarm for temp in spike_temps):
+					elif all(temp > high_alert for temp in spike_temps):
 						spike_temp = max(spike_temps)
 					else:
 						self._anomalous_spikes[formatted_date][spike_no].append(data_list)
@@ -128,24 +122,44 @@ class TemperatureData():
 					self._spikes[formatted_date]['individual_spikes'].append({'spike_no': spike_no, 'extreme_spike_temp':spike_temp,'extreme_date_time': spike_date_time, 'spike_duration': spike_duration})
 				self._spikes[formatted_date]['total_spikes_duration'] = total_spikes_duration
 				self._spikes = {k:dict(v) for k,v in self._spikes.items()} #turn to regular dictionary for easy viewing
-				return self._spikes[formatted_date]
+				spikes = self._analyze_spikes_(formatted_date)
+				return spikes
 			else:
 				return None
-		return self._spikes[formatted_date]
+		spikes = self._analyze_spikes_(formatted_date)
+		return spikes
 
-# def analyze_spikes_(self, date):
-# 	spike_dict = self.prepare_spike_dict_from_(date)
-# 	if spike_dict:
-# 		for spike_no, spike_info in spike_dict[date]['individual_spikes'].items():
-# 			if spike_info['single_spike_duration'] > Limits.limits[self._storage_condition]['single_spike_duration']:
-# 				print(f'Individual spike of {spike_info['spike_duration']} mins was observed at {spike_info['extreme_date_time']}')
-# 			if spike_dict['extreme_spike_temp'] > Limits.limits[self._storage_condition]['high_alert'] or if spike_dict['extreme_spike_temp'] < Limits.limits[self._storage_condition]['low_alert']:
-# 				print(f'Individual spike equalling {spike_info['extreme_spike_temp']} Celsius was observed at {spike_info['extreme_date_time']} ')
-# 		if spike_dict['total_spikes_duration'] > Limits.limits[self._storage_condition]['total_spike_duration']:
-# 			print(f'Total duration of temperature spikes on {date} was {spike_dict['total_spikes_duration']} mins')
+	def _analyze_spikes_(self, date):
+		try:
+			if self._spikes[date]:
+				spikes = self._spikes.copy()
+				print(spikes)
+				mkt = self._calculate_daily_MKT_for_(date)
+				for spike_info in spikes[date]['individual_spikes']:
+					if (not self._total_spike_duration_acceptable(spike_info['total_spike_duration'])
+						or not self._single_spike_duration_acceptable(spike_info['single_spike_duration'])
+						or not self._extreme_spike_temperature_acceptable(spike_info['extreme_spike_temperature'])):
+							spikes = update_(date = date,spikes = spikes,spike_no = spike_info['spike_no'])
+				spikes[date]['mkt'] = mkt
+				return spikes
+			return update_(date = date, spikes = None, spike_no = None)
+		except Exception as e:
+			print(e)
+		
 
-# 		if not total_spike_duration_acceptable() or if not single_spike_duration_acceptable() or if not extreme_spike_temperature_acceptable():
-# 			self._calculate_daily_MKT_for_(date)
+	def _total_spike_duration_acceptable(self, spike_info):
+		if spike_info['total_spikes_duration'] > Limits.limits[self._owner._storage_condition]['total_spike_duration']:
+			return False
+
+
+	def _single_spike_duration_acceptable(self, spike_info):
+		if spike_info['single_spike_duration'] > Limits.limits[self._owner._storage_condition]['single_spike_duration']:
+			return False
+
+	def _extreme_spike_temperature_acceptable(self, spike_info):
+		if spike_info['extreme_spike_temperature'] > Limits.limits[self._storage_condition]['high_alert'] or spike_info['extreme_spike_temperature'] < Limits.limits[self.owner._storage_condition]['low_alert']:
+			return False
+
 	
 	def _calculate_daily_MKT_for_(self,formatted_date, delta_h=83.144):
 		#calculates daily Mean Kinetic Temperature (MKT)
@@ -203,19 +217,6 @@ class USBLogger():
 		logger_id, serial_no_idx = obtain_logger_id_from(header)
 		serial_no, temperature_data = obtain_serial_numb_temps_from(file_contents, serial_no_idx)
 		return cls(logger_id,serial_no,temperature_data, file_basename)
-	
-	# @classmethod
-	# def check_low_high_alarms(cls):
-	# 	storage_condition = input(f'Please specify which storage conditions this logger "{self._file_basename}" was used to monitor? Enter either C (cold storage, hplc fridge), or FI (fridge), or FZ (freezer), or 25C (25°C), or 50C (50°C): ')
-	# 	return storage_condition
-		
-	# 	try:
-	# 		self._data.add_low_high_alarms(storage_condition)
-	# 		self._data._storage_condition = storage_condition
-	# 	except KeyError:
-	# 		print(f'Storage condition "{storage_condition}" is not in Alarms dictionary. Correct and try again.')
-	
-
 
 	def prepare_for_reporting(self):
 		#inserts additional data fields to the temp data for better readability when using xlsx report
@@ -242,16 +243,9 @@ class USBLogger():
 		return padded_header
 	
 	def _check_storage_condition(self):
-		storage_condition = input(f'Please specify which storage conditions this logger "{self._file_basename}" was used to monitor? Enter either C (cold storage, hplc fridge), or FI (fridge), or FZ (freezer), or 25C (25°C), or 50C (50°C): ')
+		storage_condition = input(f'Please specify which storage conditions this logger "{self._file_basename}" was used to monitor? Enter either C (cold storage, hplc fridge), or FG (fridge), or FZ (freezer), or 25C (25°C), or 50C (50°C): ')
+		storage_condition = storage_condition.upper()
 		return storage_condition
-	
-	# def check_low_high_alarms(self):
-	# 	storage_condition = input(f'Please specify which storage conditions this logger "{self._file_basename}" was used to monitor? Enter either C (cold storage, hplc fridge), or FI (fridge), or FZ (freezer), or 25C (25°C), or 50C (50°C): ')
-	# 	try:
-	# 		self._data.add_low_high_alarms(storage_condition)
-	# 		self._data._storage_condition = storage_condition
-	# 	except KeyError:
-	# 		print(f'Storage condition "{storage_condition}" is not in Alarms dictionary. Correct and try again.')
 	
 	@property
 	def data(self):
@@ -353,7 +347,7 @@ class XLSXReport():
 
 class Limits():
 	limits = {'C': {'low_alarm': -10.0, 'high_alarm': 10.0, 'low_alert': -20.0, 'high_alert':-20.0, 'single_spike_duration':3600, 'total_spike_duration': 10800},
-		   	'FI': {'low_alarm': 2.0, 'high_alarm': 8.0,'low_alert': 0.0, 'high_alert': 15.0, 'single_spike_duration':3600, 'total_spike_duration':10800},
+		   	'FG': {'low_alarm': 2.0, 'high_alarm': 8.0,'low_alert': 0.0, 'high_alert': 15.0, 'single_spike_duration':3600, 'total_spike_duration':10800},
 			'FZ': {'low_alarm': -25.0, 'high_alarm': -15.0,'low_alert': -30.0, 'high_alert': -0.1, 'single_spike_duration':3600, 'total_spike_duration':10800},
 			'25C': {'low_alarm': 24.0, 'high_alarm': 26.0,'low_alert': 15.0, 'high_alert': 30.0, 'single_spike_duration':900, 'total_spike_duration':10800},
 			'50C': {'low_alarm': 45.0, 'high_alarm': 55.0,'low_alert': 25.0, 'high_alert': 60.0, 'single_spike_duration':900, 'total_spike_duration':10800}
@@ -418,19 +412,25 @@ def get_data_start_end(logger_data, column_names):
 	row_max = len(logger_data)
 	return row_min, row_max
 
-	
+def update_(date,spikes,spike_no):
+	if spikes and spike_no:
+		print(spikes)
+		spikes[date]['individual_spikes'].append({'spike_out_of_range': 'Yes'})
+		print(f'spikes after updating {spikes}')
+	else:
+		return None
+
+#____________________________________________________________________________________________________________________________________________________
+
 if __name__ == '__main__':	
 	# file_list = [FILE_1,FILE_2,FILE_3,FILE_5,FILE_6,FILE_7,FILE_8]
 	SPIKE_FILE = r'C:\Users\User\Desktop\Misc\usb_logger_parser\ACP169_30-03-2020_artificial_spikes.txt'
 	file_list = [SPIKE_FILE]
 	usb_loggers = [USBLogger.read_from(file) for file in file_list]
 	for logger in usb_loggers:
-		# logger.check_low_high_alarms()
-		# logger.data.prepare_spike_dict_()
-		# print(logger.data._spikes)
-		mkt = logger.data._calculate_daily_MKT_for_(date(2020, 3, 16))
-		print(mkt)
+		spikes = logger.data.prepare_spike_dict_()
+		print(spikes)
 
 	# report = XLSXReport.create_from(usb_loggers)
 	# report.insert_data()
-	# report.insert_graph(
+	# report.insert_graph()

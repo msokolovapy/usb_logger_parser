@@ -1,0 +1,33 @@
+def analyze_spikes_(self, date):
+	try:
+	if self._spikes[date]:
+		spikes = self._spikes.copy()
+		mkt = self._calculate_daily_MKT_for_(date)
+		for spike_no, spike_info in self._spikes[date]['individual_spikes'].items():
+ 			if not self._total_spike_duration_acceptable(spike_info) or not self._single_spike_duration_acceptable(spike_info) or not self._extreme_spike_temperature_acceptable(spike_info):
+				spikes = update_(date = date,spikes = spikes,spike_no = spike_no)
+		spikes[date]['mkt'] = mkt
+		return spikes
+	return update_(date = date, spikes = None, spike_no = None)
+	except Exception as e:
+		print(e)
+
+def update_(date,spikes,spike_no):
+	if spikes and spike_no:
+		spikes[date]['individual_spikes'][spike_no]['spike_out_of_range'] = 'Yes'
+	else:
+		return None
+		
+
+def _total_spike_duration_acceptable(self, spike_info):
+	if spike_info['total_spikes_duration'] > Limits.limits[self._storage_condition]['total_spike_duration']:
+		return False
+
+
+def _single_spike_duration_acceptable(self, date):
+	if spike_dict['single_spike_duration'] > Limits.limits[self._storage_condition]['single_spike_duration']:
+		return False
+
+def _extreme_spike_temperature_acceptable(self, date):
+	if spike_info['extreme_spike_temperature'] > Limits.limits[[self._storage_condition]['high_alert'] or spike_info['extreme_spike_temperature'] < Limits.limits[[self._storage_condition]['low_alert']:
+		return False
