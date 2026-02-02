@@ -129,31 +129,39 @@ class TemperatureData():
 		spikes = self._analyze_spikes_(formatted_date)
 		return spikes
 
+
 	def _analyze_spikes_(self, date):
 		try:
 			if self._spikes[date]:
 				spikes = self._spikes.copy()
-				print(spikes)
-				mkt = self._calculate_daily_MKT_for_(date)
+				if not self._total_spike_duration_acceptable(date,spikes):
+					spikes[date]['total_spike_duration_out_of_range'] = 'yes'
+				else:
+					spikes[date]['total_spike_duration_out_of_range'] = 'no'
+
 				for spike_info in spikes[date]['individual_spikes']:
-					if (not self._total_spike_duration_acceptable(spike_info['total_spike_duration'])
-						or not self._single_spike_duration_acceptable(spike_info['single_spike_duration'])
-						or not self._extreme_spike_temperature_acceptable(spike_info['extreme_spike_temperature'])):
-							spikes = update_(date = date,spikes = spikes,spike_no = spike_info['spike_no'])
-				spikes[date]['mkt'] = mkt
+					if (not self._single_spike_duration_acceptable(spike_info['spike_duration'])
+						or not self._extreme_spike_temperature_acceptable(spike_info['extreme_spike_temp'])):
+							spike_info['spike_out_of_range'] = 'yes'
+					else:
+						spike_info['spike_out_of_range'] = 'no'
+				if 'total_spike_duration_out_of_range' in spikes[date] or 'spike_out_of_range' in [spike_info for spike_info in spikes[date]['individual_spikes']]:
+					mkt = self._calculate_daily_MKT_for_(date)
+					spikes[date]['mkt'] = mkt
 				return spikes
-			return update_(date = date, spikes = None, spike_no = None)
+			return None		
 		except Exception as e:
 			print(e)
-		
 
-	def _total_spike_duration_acceptable(self, spike_info):
-		if spike_info['total_spikes_duration'] > Limits.limits[self._owner._storage_condition]['total_spike_duration']:
+
+	def _total_spike_duration_acceptable(self, date,spikes):
+		if int(spikes[date]['total_spikes_duration'].total_seconds()) > Limits.limits[self._owner._storage_condition]['total_spike_duration']:
 			return False
 
 
 	def _single_spike_duration_acceptable(self, spike_info):
-		if spike_info['single_spike_duration'] > Limits.limits[self._owner._storage_condition]['single_spike_duration']:
+		spike_info = int(spike_info.total_seconds())
+		if spike_info > Limits.limits[self._owner._storage_condition]['single_spike_duration']:
 			return False
 
 	def _extreme_spike_temperature_acceptable(self, spike_info):
