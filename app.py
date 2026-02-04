@@ -23,35 +23,22 @@ class TemperatureData():
 	def __init__(self, temperature_data, owner = None):
 		self._original_data = temperature_data 
 		self._owner = owner
-		self._max = self.select_max_temperature()
-		self._min = self.select_min_temperature()
-		self._average = self.select_average_temperature()
-		self._median = self.select_median_temperature()
 		self._data_coll_freq = self.determine_ave_data_coll_frequency()
 		self._data_matrix_size = {'data_width':len(self._original_data[0]),	'data_lenth':len(self._original_data)}
 		self._spikes = defaultdict(lambda: defaultdict(list))
 		self._anomalous_spikes = defaultdict(lambda: defaultdict(list))
-
-	def select_max_temperature(self):
-		return (max(row['celsius'] for row in self.original_data))
-	def select_min_temperature(self):
-		return (min(row['celsius'] for row in self.original_data))
-	def select_average_temperature(self):
-		return (round(mean(row['celsius'] for row in self.original_data),2))
-	def select_median_temperature(self):
-		return (median(row['celsius'] for row in self.original_data))
 	
 	def determine_ave_data_coll_frequency(self):
-		time_diffs = list(self.get_time_diff())  # List of timedelta objects
+		time_diffs = list(get_time_diff(self._original_data))  # List of timedelta objects
 		avg_timedelta = sum(time_diffs, timedelta()) / len(time_diffs)
 		return avg_timedelta
 
-	def get_time_diff(self):
-		prev_timestamp = None
-		for row in self._original_data:
-			if prev_timestamp is not None:
-				yield row['date_time'] - prev_timestamp
-			prev_timestamp = row['date_time']
+	# def get_time_diff(self):
+	# 	prev_timestamp = None
+	# 	for row in self._original_data:
+	# 		if prev_timestamp is not None:
+	# 			yield row['date_time'] - prev_timestamp
+	# 		prev_timestamp = row['date_time']
 
 	def _extract_temps_for_(self,date):
 		try:
@@ -184,29 +171,12 @@ class TemperatureData():
 	def original_data(self):
 		return self._original_data
 	@property
-	def min(self):
-		return self._min
-	@property
-	def max(self):
-		return self._max
-	@property
-	def average(self):
-		return self._average
-	@property
-	def median(self):
-		return self._median
-	@property
 	def data_matrix_size(self):
 		return self._data_matrix_size
 	@property
 	def data_coll_freq(self):
 		return self._data_coll_freq
-	@property
-	def high_alarm(self):
-		return self._high_alarm
-	@property
-	def low_alarm(self):
-		return self._low_alarm
+
 
 
 class USBLogger():
@@ -363,6 +333,14 @@ class Limits():
 #___________________________________________________________________________________________________________________
 #	HELPER FUNCTIONS BELOW:
 
+def get_time_diff(data):
+	prev_timestamp = None
+	for row in data:
+		if prev_timestamp is not None:
+			yield row['date_time'] - prev_timestamp
+		prev_timestamp = row['date_time']
+
+
 def data_collection_frequency_check(usb_loggers):
 	frequencies = [logger.data.data_coll_freq for logger in usb_loggers]
 	most_common = Counter(frequencies).most_common()[0][0]
@@ -420,14 +398,6 @@ def get_data_start_end(logger_data, column_names):
 	row_max = len(logger_data)
 	return row_min, row_max
 
-def update_(date,spikes,spike_no):
-	if spikes and spike_no:
-		print(spikes)
-		spikes[date]['individual_spikes'].append({'spike_out_of_range': 'Yes'})
-		print(f'spikes after updating {spikes}')
-	else:
-		return None
-
 #____________________________________________________________________________________________________________________________________________________
 
 if __name__ == '__main__':	
@@ -436,8 +406,9 @@ if __name__ == '__main__':
 	file_list = [SPIKE_FILE]
 	usb_loggers = [USBLogger.read_from(file) for file in file_list]
 	for logger in usb_loggers:
-		spikes = logger.data.prepare_spike_dict_()
-		print(spikes)
+		print(logger.data.data_coll_freq)
+		# spikes = logger.data.prepare_spike_dict_()
+		# print(spikes)
 
 	# report = XLSXReport.create_from(usb_loggers)
 	# report.insert_data()
