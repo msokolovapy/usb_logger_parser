@@ -1578,4 +1578,5 @@ def validate_data(df):
 
 
 
+
 print(excursions)
