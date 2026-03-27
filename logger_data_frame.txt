@@ -1518,6 +1518,7 @@ temp_data.loc[temp_data['celsius'] < low_alarm, 'status'] = 'too_low'
 #add cumulative spike id to be able to number spikes:
 temp_data['cumulat_spike_id'] = (temp_data['status'] != temp_data['status'].shift()).cumsum()
 
+
 #obtain grouped temp data for each spike found:
 temp_data_grouped = temp_data[temp_data['status'].isin(['too_high', 'too_low'])].groupby('cumulat_spike_id').agg(
     spike_status=('status','first'),
@@ -1532,7 +1533,6 @@ temp_data_grouped = temp_data[temp_data['status'].isin(['too_high', 'too_low'])]
 temp_data_grouped['spike_duration_mins'] = ((temp_data_grouped['spike_end_time'] - temp_data_grouped['spike_start_time']).dt.total_seconds() / 60).astype(int)
 
 #add spike id (consecutive number starting at 1) to be used instead of cumulative spike id (which is essentially a random number starting at 1)
-temp_data_grouped['spike_id'] = temp_data_grouped.groupby('cumulat_spike_id').ngroup() + 1
 
 #initiate id column for extreme temperature at which spike was observed:
 temp_data_grouped['extreme_idx'] = temp_data_grouped['spike_max_temp_id'] #randomly set to spike_max_temp_id
@@ -1542,41 +1542,24 @@ temp_data_grouped.loc[temp_data_grouped['spike_status'] == 'too_low', 'extreme_i
 temp_data_grouped['extreme_temp'] = temp_data.loc[temp_data_grouped['extreme_idx'], 'celsius'].values
 temp_data_grouped['extreme_date_time'] = temp_data.loc[temp_data_grouped['extreme_idx'], 'date_time'].values
 
+temp_data_grouped['spike_id'] = temp_data_grouped.groupby(temp_data_grouped['extreme_date_time'].dt.date).cumcount() + 1
+
+
 #retrieve only relevant columns from temp_data_grouped:
 excursions = pd.DataFrame({'spike_numb':temp_data_grouped['spike_id'].values,
                            'spike_extreme_temp': temp_data_grouped['extreme_temp'].values,
                             'spike_extreme_date_time':temp_data_grouped['extreme_date_time'].values,
-                             'spike_duration_mins': temp_data_grouped['spike_duration_mins'].values})
+                             'spike_duration_mins': temp_data_grouped['spike_duration_mins'].values,
+                              "spike_date": temp_data_grouped['spike_start_time'].dt.date})
+
+
 excursions = excursions.to_dict('records')
 
 
-def validate_data(df):
-    """Validate DataFrame structure and content."""
-    required_cols = ['Time', 'Celsius(°C)', 'Serial Number']
-    
-    if df.empty:
-        raise ValueError("DataFrame is empty")
-    
-    missing = set(required_cols) - set(df.columns)
-    if missing:
-        raise ValueError(f"Missing columns: {missing}")
-    
-    for column in required_cols:
-        if df[column].isna().any():
-            raise ValueError(f"Column '{column}' has missing values")
-    try:
-        pd.to_datetime(df['Time'], errors='raise')
-    except (ValueError, ParserError):
-        raise ValueError("'Time' column not in 'yyyy-mm-dd HH:MM' format")
-
-    try:
-        pd.to_numeric(df['celsius'], errors='raise')
-    except (ValueError, TypeError):
-        raise ValueError("'Celsius(°C)' column contains non-numeric values")
-
-    return df
-
-
-
-
 print(excursions)
+
+
+
+[{'spike_numb': 1, 'spike_extreme_temp': 10.0, 'spike_extreme_date_time': Timestamp('2020-03-16 12:20:00'), 'spike_duration_mins': 220, 'spike_date': datetime.date(2020, 3, 16)}, {'spike_numb': 1, 'spike_extreme_temp': -37.0, 'spike_extreme_date_time': Timestamp('2020-03-17 01:00:00'), 'spike_duration_mins': 80, 'spike_date': datetime.date(2020, 3, 17)}, {'spike_numb': 2, 'spike_extreme_temp': -14.5, 'spike_extreme_date_time': Timestamp('2020-03-17 12:50:00'), 'spike_duration_mins': 0, 'spike_date': datetime.date(2020, 3, 17)}, {'spike_numb': 1, 'spike_extreme_temp': -8.0, 'spike_extreme_date_time': Timestamp('2020-03-18 15:10:00'), 'spike_duration_mins': 70, 'spike_date': datetime.date(2020, 3, 18)}, {'spike_numb': 1, 'spike_extreme_temp': -14.5, 'spike_extreme_date_time': Timestamp('2020-03-25 11:20:00'), 'spike_duration_mins': 10, 'spike_date': datetime.date(2020, 3, 25)}, {'spike_numb': 2, 'spike_extreme_temp': -14.0, 'spike_extreme_date_time': Timestamp('2020-03-25 19:10:00'), 'spike_duration_mins': 20, 'spike_date': datetime.date(2020, 3, 25)}, {'spike_numb': 1, 'spike_extreme_temp': -13.5, 'spike_extreme_date_time': Timestamp('2020-03-26 14:20:00'), 'spike_duration_mins': 20, 'spike_date': datetime.date(2020, 3, 26)}]
+	
+
