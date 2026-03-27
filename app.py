@@ -7,6 +7,7 @@ from datetime import timedelta
 from collections import Counter
 from xlsxwriter import Workbook
 import logging
+import pandas as pd
 
 
 FILE_1 = r'N:\GMP Quality Assurance\QA Accessible Documents\Data Logger Downloads\Temperature Mapping\ACPL228\Nov 2025\ACPL149_ACPL228.txt'
@@ -284,20 +285,20 @@ class AnalyticalService():
 		valid_files = []
 		for file in file_list:
 			try:
-				df = pd.read_csv(file_path, encoding='latin-1')
+				df = pd.read_csv(file,encoding='latin-1')
 				if df.empty:
-					logger.warning(f"Empty dataframe when trying to load {file}"
+					logger.warning(f"Empty dataframe when trying to load {file}")
 			except FileNotFoundError:
 				logger.error(f"No file '{file}' found")
 			except Exception as e:
-				logger.exception(f"Unexpected error ({e})occured when trying to load {file}"
+				logger.exception(f"Unexpected error ({e})occured when trying to load {file}")
 		required_columns = ["Time", "Celsius(°C)"]
 		missing_columns = set(required_columns) - set(df.columns.values())
 		if missing_columns:
-			logger.warning(f"Some columns are missing: {missing_columns}"
+			logger.warning(f"Some columns are missing: {missing_columns}")
 		for column in required_columns:
 			if df[column].isna().any():
-				logger.warning(f"Some values are missing in {column}"
+				logger.warning(f"Some values are missing in {column}")
 			file.append(valid_files)
 		if valid_files:
 			return valid_files
@@ -355,65 +356,65 @@ class AnalyticalService():
 																	)
 		return temp_data
 
-	def  _add_spike_duration(self,temp_data):
-		"""Finds spike duration in minutes"
-		for data in temp_data:
-			data.df['spike_duration_mins'] = ((data.df['spike_end_time'] - data.df['spike_start_time']).dt.total_seconds() / 60).astype(int)
-		return temp_data
+# 	def  _add_spike_duration(self,temp_data):
+# 		"""Finds spike duration in minutes"
+# 		for data in temp_data:
+# 			data.df['spike_duration_mins'] = ((data.df['spike_end_time'] - data.df['spike_start_time']).dt.total_seconds() / 60).astype(int)
+# 		return temp_data
 
-	def _reindex(self,temp_data):
-		"""Adds spike id (consecutive number starting at 1) to be used instead of cumulative spike id (which is essentially a random number starting at 1)
-		for data in temp_data:
-			data.df['spike_id'] = data.df.groupby('cumulat_spike_id').ngroup() + 1
-		return temp_data
+# 	def _reindex(self,temp_data):
+# 		"""Adds spike id (consecutive number starting at 1) to be used instead of cumulative spike id (which is essentially a random number starting at 1)"""
+# 		for data in temp_data:
+# 			data.df['spike_id'] = data.df.groupby('cumulat_spike_id').ngroup() + 1
+# 		return temp_data
 
-	def _add_extreme_temp_idx(self,temp_data):
-		"""Initiates id column for extreme temperature at which spike was observed"""
-		for data in temp_data:
-			data.df['extreme_idx'] = data.df['spike_max_temp_id'] #randomly set to spike_max_temp_id
-			data.df.loc[data.df['spike_status'] == 'too_low', 'extreme_idx'] = data.df['spike_min_temp_id'] #re-write extreme id column values for when spike status is 'too_low'
-		return temp_data
+# 	def _add_extreme_temp_idx(self,temp_data):
+# 		"""Initiates id column for extreme temperature at which spike was observed"""
+# 		for data in temp_data:
+# 			data.df['extreme_idx'] = data.df['spike_max_temp_id'] #randomly set to spike_max_temp_id
+# 			data.df.loc[data.df['spike_status'] == 'too_low', 'extreme_idx'] = data.df['spike_min_temp_id'] #re-write extreme id column values for when spike status is 'too_low'
+# 		return temp_data
 
-	def _add_extreme_temp(self, temp_data,temp_data_grouped):
-		"""Retrieves extreme spike temperature and date/time stamp using extreme id"""
-		for data in temp_data_grouped:
-			data.df['extreme_temp'] = temp_data.loc[temp_data_grouped['extreme_idx'], 'celsius'].values
-temp_data_grouped['extreme_date_time'] = temp_data.loc[temp_data_grouped['extreme_idx'], 'date_time'].values
+# 	def _add_extreme_temp(self, temp_data,temp_data_grouped):
+# 		"""Retrieves extreme spike temperature and date/time stamp using extreme id"""
+# 		for data in temp_data_grouped:
+# 			data.df['extreme_temp'] = temp_data.loc[temp_data_grouped['extreme_idx'], 'celsius'].values
+# temp_data_grouped['extreme_date_time'] = temp_data.loc[temp_data_grouped['extreme_idx'], 'date_time'].values
 
-#retrieve only relevant columns from temp_data_grouped:
-excursions = pd.DataFrame({'spike_numb':temp_data_grouped['spike_id'].values,
-                           'spike_extreme_temp': temp_data_grouped['extreme_temp'].values,
-                            'spike_extreme_date_time':temp_data_grouped['extreme_date_time'].values,
-                             'spike_duration_mins': temp_data_grouped['spike_duration_mins'].values})
-excursions = excursions.to_dict('records')
-	def calculate_24hr_total_spike_duration(self, spike_dict):
-		return None
+# #retrieve only relevant columns from temp_data_grouped:
+# excursions = pd.DataFrame({'spike_numb':temp_data_grouped['spike_id'].values,
+#                            'spike_extreme_temp': temp_data_grouped['extreme_temp'].values,
+#                             'spike_extreme_date_time':temp_data_grouped['extreme_date_time'].values,
+#                              'spike_duration_mins': temp_data_grouped['spike_duration_mins'].values})
+# excursions = excursions.to_dict('records')
+# 	def calculate_24hr_total_spike_duration(self, spike_dict):
+# 		return None
 
-class SpikeDict():
-	def __init__(self, date, daily_total_spikes_duration, 24hrs_total_spikes_duration = None, spikes_info):
-		self._date = date
-		self._daily_total_spikes_duration = daily_total_spikes_duration
-		self._24hrs_total_spikes_duration = 24hrs_total_spikes_duration
-		self._spikes_info = spikes_info
+# class SpikeDict():
+# 	def __init__(self, date, daily_total_spikes_duration, 24hrs_total_spikes_duration = None, spikes_info):
+# 		self._date = date
+# 		self._daily_total_spikes_duration = daily_total_spikes_duration
+# 		self._24hrs_total_spikes_duration = 24hrs_total_spikes_duration
+# 		self._spikes_info = spikes_info
 		
-	def get_summary(self):
-		return self._spikes_info
+# 	def get_summary(self):
+# 		return self._spikes_info
 
-	def get_spike_duration(self, spike_numb = spike_numb):
-		return self._spikes_info[spike_numb]['spike_duration_mins']
+# 	def get_spike_duration(self, spike_numb = spike_numb):
+# 		return self._spikes_info[spike_numb]['spike_duration_mins']
 
-	def get_spike_temp(self,spike_numb = spike_numb):
-		return self._spikes_info[spike_numb]['spike_extreme_temp'
+# 	def get_spike_temp(self,spike_numb = spike_numb):
+# 		return self._spikes_info[spike_numb]['spike_extreme_temp'
 
-	def get_mkt(self,spike_numb = spike_numb):
-		return self._spikes_info[spike_numb]['mkt']	
+# 	def get_mkt(self,spike_numb = spike_numb):
+# 		return self._spikes_info[spike_numb]['mkt']	
 
-	@property
-	def date(self):
-		return self._date
-	@property
-	def daily_total_duration(self):
-		return self._daily_total_spikes_duration
+# 	@property
+# 	def date(self):
+# 		return self._date
+# 	@property
+# 	def daily_total_duration(self):
+# 		return self._daily_total_spikes_duration
 
 
 #spikes.daily_total_duration
@@ -422,6 +423,9 @@ class SpikeDict():
 #spikes.get_spike_duration(spike_numb = 2)
 #spikes.get_summary
 #spikes.get_mkt(spike_numb = 2)
+
+class ReportingService():
+	pass
 
 
 
