@@ -1,5 +1,7 @@
 import pandas as pd
 from io import StringIO
+from datetime import timedelta
+
 csv_data = """ACP169 BU_FZ156,date_time,celsius,high_alarm, low_alarm, serial_number
 1,2020-03-16 10:30:00,0.0,-4.5,-25.5,052297777
 2,2020-03-16 10:40:00,0.5,-4.5,-25.5
@@ -1553,10 +1555,30 @@ excursions = pd.DataFrame({'spike_numb':temp_data_grouped['spike_id'].values,
                               "spike_date": temp_data_grouped['spike_start_time'].dt.date})
 
 
+df_daily_last_spikes = excursions.groupby('spike_date').tail(1)
+
+def calc_24h_prior_total(row, all_spikes_df):  
+    reference = row['spike_extreme_date_time'] - timedelta(hours=24)
+    
+    # Look at ALL spikes in full DataFrame
+    mask = (all_spikes_df['spike_extreme_date_time'] >= reference) & \
+           (all_spikes_df['spike_extreme_date_time'] < row['spike_extreme_date_time'])
+    
+    return all_spikes_df[mask]['spike_duration_mins'].sum()
+
+
+df_daily_last_spikes['duration_24h_prior'] = df_daily_last_spikes.apply(
+    lambda row: calc_24h_prior_total(row, excursions),  # Pass FULL df
+    axis=1
+)
+
+
+
 excursions = excursions.to_dict('records')
 
 
 print(excursions)
+print(df_daily_last_spikes.to_dict('records'))
 
 
 

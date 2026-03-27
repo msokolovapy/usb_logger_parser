@@ -389,6 +389,41 @@ excursions = excursions.to_dict('records')
 	def calculate_24hr_total_spike_duration(self, spike_dict):
 		return None
 
+class SpikeDict():
+	def __init__(self, date, daily_total_spikes_duration, 24hrs_total_spikes_duration = None, spikes_info):
+		self._date = date
+		self._daily_total_spikes_duration = daily_total_spikes_duration
+		self._24hrs_total_spikes_duration = 24hrs_total_spikes_duration
+		self._spikes_info = spikes_info
+		
+	def get_summary(self):
+		return self._spikes_info
+
+	def get_spike_duration(self, spike_numb = spike_numb):
+		return self._spikes_info[spike_numb]['spike_duration_mins']
+
+	def get_spike_temp(self,spike_numb = spike_numb):
+		return self._spikes_info[spike_numb]['spike_extreme_temp'
+
+	def get_mkt(self,spike_numb = spike_numb):
+		return self._spikes_info[spike_numb]['mkt']	
+
+	@property
+	def date(self):
+		return self._date
+	@property
+	def daily_total_duration(self):
+		return self._daily_total_spikes_duration
+
+
+#spikes.daily_total_duration
+#spikes.date
+#spikes.get_spike_temp(spike_numb = 1)
+#spikes.get_spike_duration(spike_numb = 2)
+#spikes.get_summary
+#spikes.get_mkt(spike_numb = 2)
+
+
 
 		
 def main():
