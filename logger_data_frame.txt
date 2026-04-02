@@ -1,6 +1,7 @@
 import pandas as pd
 from io import StringIO
 from datetime import timedelta
+import numpy as np
 
 csv_data = """ACP169 BU_FZ156,date_time,celsius,high_alarm, low_alarm, serial_number
 1,2020-03-16 10:30:00,0.0,-4.5,-25.5,052297777
@@ -1504,25 +1505,60 @@ csv_data = """ACP169 BU_FZ156,date_time,celsius,high_alarm, low_alarm, serial_nu
 1499,2020-03-26 20:10:00,-22.5,-4.5,-25.5
 1500,2020-03-26 20:20:00,-22.5,-4.5,-25.5
 """
-temp_data = pd.read_csv(StringIO(csv_data))
+temp_data_raw = pd.read_csv(StringIO(csv_data))
 high_alarm = -15
 low_alarm = -25
-temp_data = temp_data.rename(columns={'Time':'date_time',
+temp_data_raw = temp_data_raw.rename(columns={'Time':'date_time',
 		'Celsius(°C)':'celsius',
 		'High Alarm':'high_alarm',
 		'Low Alarm':'low_alarm',
 		'Serial Number':'serial_number'}
 		)
-temp_data['date_time'] = pd.to_datetime(temp_data['date_time'])
+temp_data_raw['date_time'] = pd.to_datetime(temp_data_raw['date_time'])
+temp_data_raw = temp_data_raw.sort_values('date_time')
 #Find spikes and add 'status' column, which will be used to filter spike max (if too_high) or min (if too_low) temperature:
-temp_data.loc[temp_data['celsius'] > high_alarm, 'status'] = 'too_high'
-temp_data.loc[temp_data['celsius'] < low_alarm, 'status'] = 'too_low'
+temp_data_raw.loc[temp_data_raw['celsius'] > high_alarm, 'status'] = 'too_high'
+temp_data_raw.loc[temp_data_raw['celsius'] < low_alarm, 'status'] = 'too_low'
 #add cumulative spike id to be able to number spikes:
-temp_data['cumulat_spike_id'] = (temp_data['status'] != temp_data['status'].shift()).cumsum()
+temp_data_raw['cumulat_spike_id'] = (temp_data_raw['status'] != temp_data_raw['status'].shift()).cumsum()
 
+temp_data_raw['reading_gap_mins'] = temp_data_raw.groupby('cumulat_spike_id')['date_time'].diff().dt.total_seconds() / 60
+
+temp_data = temp_data_raw[temp_data_raw['status'].isin(['too_high', 'too_low'])][['cumulat_spike_id','date_time','celsius','status']]
+
+temp_data['last_spike_of_day'] = (
+    (temp_data['date_time'].dt.date != temp_data['date_time'].dt.date.shift(-1))
+)
+
+
+temp_data['24hr_window_start'] = pd.to_datetime(np.where(
+    temp_data['last_spike_of_day'],
+    (temp_data['date_time'] - pd.Timedelta(hours=24)).dt.floor('s'),
+    pd.NaT
+))
+
+
+df_last_spike_of_day = temp_data[temp_data['last_spike_of_day']==True][['date_time','last_spike_of_day','24hr_window_start']]
+
+def spike_duration_in_window(row, temp_data):
+    mask = (
+        (temp_data['date_time'] >= row['24hr_window_start']) &
+        (temp_data['date_time'] <= row['date_time']) &
+        (temp_data['status'].isin(['too_high', 'too_low']))
+    )
+    
+    filtered = temp_data.loc[mask].copy() 
+    if filtered.empty:
+        return 0
+    
+    return filtered['reading_gap_mins'].sum()
+
+df_last_spike_of_day['spike_duration_24hr_mins'] = df_last_spike_of_day.apply(
+    spike_duration_in_window, axis=1, temp_data=temp_data_raw
+)
 
 #obtain grouped temp data for each spike found:
-temp_data_grouped = temp_data[temp_data['status'].isin(['too_high', 'too_low'])].groupby('cumulat_spike_id').agg(
+temp_data_grouped = temp_data_raw[temp_data_raw['status'].isin(['too_high', 'too_low'])].groupby('cumulat_spike_id').agg(
     spike_status=('status','first'),
     spike_max_temp=('celsius', 'max'),
     spike_min_temp=('celsius', 'min'),
@@ -1534,8 +1570,6 @@ temp_data_grouped = temp_data[temp_data['status'].isin(['too_high', 'too_low'])]
 #find spike duration in minutes:
 temp_data_grouped['spike_duration_mins'] = ((temp_data_grouped['spike_end_time'] - temp_data_grouped['spike_start_time']).dt.total_seconds() / 60).astype(int)
 
-#add spike id (consecutive number starting at 1) to be used instead of cumulative spike id (which is essentially a random number starting at 1)
-
 #initiate id column for extreme temperature at which spike was observed:
 temp_data_grouped['extreme_idx'] = temp_data_grouped['spike_max_temp_id'] #randomly set to spike_max_temp_id
 temp_data_grouped.loc[temp_data_grouped['spike_status'] == 'too_low', 'extreme_idx'] = temp_data_grouped['spike_min_temp_id'] #re-write extreme id column values for when spike status is 'too_low'
@@ -1544,6 +1578,7 @@ temp_data_grouped.loc[temp_data_grouped['spike_status'] == 'too_low', 'extreme_i
 temp_data_grouped['extreme_temp'] = temp_data.loc[temp_data_grouped['extreme_idx'], 'celsius'].values
 temp_data_grouped['extreme_date_time'] = temp_data.loc[temp_data_grouped['extreme_idx'], 'date_time'].values
 
+#add spike id (consecutive number starting at 1) to be used instead of cumulative spike id (which is essentially a random number starting at 1)
 temp_data_grouped['spike_id'] = temp_data_grouped.groupby(temp_data_grouped['extreme_date_time'].dt.date).cumcount() + 1
 
 
@@ -1555,33 +1590,9 @@ excursions = pd.DataFrame({'spike_numb':temp_data_grouped['spike_id'].values,
                               "spike_date": temp_data_grouped['spike_start_time'].dt.date})
 
 
-df_daily_last_spikes = excursions.groupby('spike_date').tail(1)
-
-def calc_24h_prior_total(row, all_spikes_df):  
-    reference = row['spike_extreme_date_time'] - timedelta(hours=24)
-    
-    # Look at ALL spikes in full DataFrame
-    mask = (all_spikes_df['spike_extreme_date_time'] >= reference) & \
-           (all_spikes_df['spike_extreme_date_time'] < row['spike_extreme_date_time'])
-    
-    return all_spikes_df[mask]['spike_duration_mins'].sum()
-
-
-df_daily_last_spikes['duration_24h_prior'] = df_daily_last_spikes.apply(
-    lambda row: calc_24h_prior_total(row, excursions),  # Pass FULL df
-    axis=1
-)
-
-
-
 excursions = excursions.to_dict('records')
 
+print(df_last_spike_of_day.head(50))
 
-print(excursions)
-print(df_daily_last_spikes.to_dict('records'))
-
-
-
-[{'spike_numb': 1, 'spike_extreme_temp': 10.0, 'spike_extreme_date_time': Timestamp('2020-03-16 12:20:00'), 'spike_duration_mins': 220, 'spike_date': datetime.date(2020, 3, 16)}, {'spike_numb': 1, 'spike_extreme_temp': -37.0, 'spike_extreme_date_time': Timestamp('2020-03-17 01:00:00'), 'spike_duration_mins': 80, 'spike_date': datetime.date(2020, 3, 17)}, {'spike_numb': 2, 'spike_extreme_temp': -14.5, 'spike_extreme_date_time': Timestamp('2020-03-17 12:50:00'), 'spike_duration_mins': 0, 'spike_date': datetime.date(2020, 3, 17)}, {'spike_numb': 1, 'spike_extreme_temp': -8.0, 'spike_extreme_date_time': Timestamp('2020-03-18 15:10:00'), 'spike_duration_mins': 70, 'spike_date': datetime.date(2020, 3, 18)}, {'spike_numb': 1, 'spike_extreme_temp': -14.5, 'spike_extreme_date_time': Timestamp('2020-03-25 11:20:00'), 'spike_duration_mins': 10, 'spike_date': datetime.date(2020, 3, 25)}, {'spike_numb': 2, 'spike_extreme_temp': -14.0, 'spike_extreme_date_time': Timestamp('2020-03-25 19:10:00'), 'spike_duration_mins': 20, 'spike_date': datetime.date(2020, 3, 25)}, {'spike_numb': 1, 'spike_extreme_temp': -13.5, 'spike_extreme_date_time': Timestamp('2020-03-26 14:20:00'), 'spike_duration_mins': 20, 'spike_date': datetime.date(2020, 3, 26)}]
 	
 
