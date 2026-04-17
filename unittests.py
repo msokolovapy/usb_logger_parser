@@ -1,4 +1,5 @@
 import unittest
+from unittest.mock import Mock
 from unittest.mock import patch
 import pandas as pd
 from app import logger
@@ -112,16 +113,21 @@ class TestAnalyticalServiceInit(unittest.TestCase):
 
 class TestAnalyzeSpikes(unittest.TestCase):
 	def setUp(self):
-		pass
+		self.analytical_service = AnalyticalService()
 	def tearDown(self):
 		pass
 	def test_analyze_spikes(self):
-		storage_units = ['storage_1', 'storage_2']
-		analytical_service = AnalyticalService()
-		spike_dict_list = analytical_service.analyze_spikes(storage_units)
+		storage_units = [Mock(), Mock()]
+		spike_dict_list = self.analytical_service.analyze_spikes(storage_units)
 		for dict in spike_dict_list:
 			with self.subTest(dict):
 				self.assertEqual(list(dict.items()), [('dict_key',1)])
+	def test_add_status_column(self):
+		temp_data = Mock()
+		temp_data_copy = self.analytical_service.add_status_column(temp_data)
+		self.assertIsNot(temp_data, temp_data_copy)
+
+
 		
 
 
