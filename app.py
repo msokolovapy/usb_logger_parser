@@ -433,12 +433,11 @@ class ReportingService():
 def main():
 	file_list = []
 	reporting_service = ReportingService()
-	analytical_service = AnalyticalService.create_from_(file_list)
-	valid_files = analytical_service.get_files()
-	temp_data = [TemperatureData.read_from(file) for file in valid_files]
-	spike_dicts = analytical_service.analyze_spikes(temp_data)
+	analytical_service = AnalyticalService()
+	storage_units = [StorageCondition.create_from_(file) for file in files]
+	spike_dicts = analytical_service.analyze_spikes(storage_units)
 	xlsx_spike_reports = reporting_service.report_spike_dict_(spike_dicts)
-	xlsx_data_reports = reporting_service.report_data_(temp_data)
+	xlsx_data_reports = reporting_service.report_data_(storage_units)
 
 
 

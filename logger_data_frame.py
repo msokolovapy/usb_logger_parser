@@ -2,6 +2,7 @@ import pandas as pd
 from io import StringIO
 from datetime import timedelta
 import numpy as np
+import math
 
 csv_data = """ACP169 BU_FZ156,date_time,celsius,high_alarm, low_alarm, serial_number
 1,2020-03-16 10:30:00,0.0,-4.5,-25.5,052297777
@@ -1538,7 +1539,7 @@ temp_data['24hr_window_start'] = pd.to_datetime(np.where(
 ))
 
 
-df_last_spike_of_day = temp_data[temp_data['last_spike_of_day']==True][['date_time','last_spike_of_day','24hr_window_start']]
+df_last_spike_of_day = temp_data[temp_data['last_spike_of_day']==True][['cumulat_spike_id','date_time','last_spike_of_day','24hr_window_start']]
 
 def spike_duration_in_window(row, temp_data):
     mask = (
@@ -1590,9 +1591,39 @@ excursions = pd.DataFrame({'spike_numb':temp_data_grouped['spike_id'].values,
                               "spike_date": temp_data_grouped['spike_start_time'].dt.date})
 
 
-excursions = excursions.to_dict('records')
+def calculate_mkt(row,df):
+	filtered = apply_12hr_filter(row,df)
+	mkt = apply_arrhenius(filtered)
+	return mkt
 
-print(df_last_spike_of_day.head(50))
+def apply_12hr_filter(row,df):
+	start = row['spike_extreme_date_time'] - timedelta(hours = 12)
+	end = row['spike_extreme_date_time'] + timedelta(hours = 12)
+	mask = ((df['date_time'] > start)&(df['date_time'] <= end))
+	filtered = df[mask]
+	return filtered
 
-	
+def apply_arrhenius(filtered_df):
+	delta_H = 83.144
+	R_constant = 0.0083144
+
+	filtered_df['mkt_temp_variable'] = np.exp(-delta_H/(R_constant*(filtered_df['celsius'] + 273.15)))
+	sum_mkt_temp_variables = filtered_df['mkt_temp_variable'].sum()
+	mkt = (delta_H/R_constant)/(-math.log(sum_mkt_temp_variables/len(filtered_df))) - 273.15
+	mkt = round(mkt,1)
+	return mkt
+
+
+excursions['mkt'] = excursions.apply(calculate_mkt,axis = 1, df = temp_data_raw)
+
+merged = pd.merge(excursions, df_last_spike_of_day, on='cumulat_spike_id', how = 'left')
+
+excursions = merged[['spike_numb','spike_extreme_temp', 
+                    'spike_extreme_date_time', 'spike_duration_mins',  
+                    'spike_date', 'last_spike_of_day', 'spike_duration_24hr_mins' ]]
+
+def check_against_limits(df_excursions):
+	pass
+
+print(excursions.head(50))
 

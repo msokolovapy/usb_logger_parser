@@ -1,9 +1,9 @@
 import unittest
 from unittest.mock import patch
-import io
 import pandas as pd
 from dataclasses import dataclass
 import logging
+import os
 
 logging.basicConfig(
     level=logging.INFO,
@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 SAMPLE_DF = pd.DataFrame({
     "ACP169 BU_FZ156": [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20],
-    "date_time": [
+    "Time": [
         "2020-03-16 10:30:00",
         "2020-03-16 10:40:00",
         "2020-03-16 10:50:00",
@@ -40,19 +40,36 @@ SAMPLE_DF = pd.DataFrame({
         "2020-03-16 13:30:00",
         "2020-03-16 13:40:00",
     ],
-    "celsius": [0.0,0.5,1.0,1.5,2.0,2.5,3.5,4.5,5.0,6.0,7.0,10.0,9.0,8.0,8.5,7.0,7.3,6.0,5.5,5.0],
-    "high_alarm": [-4.5] * 20,
-    "low_alarm":  [-25.5] * 20,
-    "serial_number": ["052297777"] + [None] * 19,
+    "Celsius(°C)": [0.0,0.5,1.0,1.5,2.0,2.5,3.5,4.5,5.0,6.0,7.0,10.0,9.0,8.0,8.5,7.0,7.3,6.0,5.5,5.0],
+    "High Alarm": [-4.5] * 20,
+    "Low Alarm":  [-25.5] * 20,
+    "Serial Number": ["052297777"] + [None] * 19,
 })
 
 
-
 def read(file):
-	pass
+	valid_file = validate_(file)
+	df= pd.read_csv(valid_file, encoding = 'latin-1')
+	df_temp_data,logger_id, serial_numb = parse_(df) 
+	file_basename = os.path.basename(file)
+	return df_temp_data,logger_id, serial_numb, file_basename
 
 def get_average_temp():
 	pass
+
+def parse_(df):
+		df.rename(columns={'Time': 'date_time',
+			'Celsius(°C)':'celsius',
+			'High Alarm':'high_alarm',
+			'Low Alarm':'low_alarm',
+			'Serial Number':'serial_number'
+			}, inplace=True)
+		logger_id = df.columns.values[0]
+		serial_numb = df['serial_number'][0]
+		df.drop(columns=[logger_id, "serial_number"], inplace=True)
+		return df, logger_id, serial_numb
+		
+
 
 def get_user_confirmation():
 	user_input = input("It looks like your temperature trace '{file_basename}' for logger {logger_id}\
@@ -81,7 +98,7 @@ class StorageCondition():
 					return Freezer(df_temp_data,logger_id, serial_numb, file_basename)
 		elif Limits.storage_25c.low_alarm <= average_temp <= Limits.storage_25c.high_alarm:
 					return TwentyFiveCelsius(df_temp_data,logger_id, serial_numb, file_basename)
-		elif Limits.storage_50c.low_alarm <= average_temp <= Limits.storage_50c.high_alarm::
+		elif Limits.storage_50c.low_alarm <= average_temp <= Limits.storage_50c.high_alarm:
 					return FiftyCelsius(df_temp_data,logger_id, serial_numb, file_basename)
 		else:
 			return create_storage_condition_manually(df_temp_data,logger_id, serial_numb, file_basename)
@@ -96,29 +113,29 @@ def create_storage_condition_manually(df_temp_data,logger_id, serial_numb, file_
 			return storage_condition
 		else:
 			storage_str = ('/ ').join(storage_condit_dict.keys())
-			print('Please select storage condition from {storage_str')
+			print(f'Please select storage condition from {storage_str}')
 			continue
 
 def validate_(file_list):
 	valid_files = []
 	for file in file_list:
 		try:
-			df = pd.read_csv(file_path, encoding='latin-1')
+			df = pd.read_csv(file, encoding='latin-1')
 			if df.empty:
-				logger.warning(f"Empty dataframe when trying to load {file}"
+				logger.warning(f"Empty dataframe when trying to load {file}")
 		except FileNotFoundError:
 			logger.error(f"No file '{file}' found")
 		except Exception as e:
-			logger.exception(f"Unexpected error ({e})occured when trying to load {file}"
+			logger.exception(f"Unexpected error ({e})occured when trying to load {file}")
 		
 		required_columns = ["Time", "Celsius(°C)"]
-		missing_columns = set(required_columns) - set(df.columns.values())
+		missing_columns = set(required_columns) - set(df.columns)
 		if missing_columns:
-			logger.warning(f"Some columns are missing: {missing_columns}"
+			logger.warning(f"Some columns are missing: {missing_columns}")
 		for column in required_columns:
 			if df[column].isna().any():
-				logger.warning(f"Some values are missing in {column}"
-			file.append(valid_files)
+				logger.warning(f"Some values are missing in '{column}' column")
+			valid_files.append(file)
 		if valid_files:
 			return valid_files
 		logger.warning(f"No valid data files were provided")
@@ -135,6 +152,8 @@ class Fridge(StorageCondition):
 		self.temp_data = df_temp_data
 		self.logger = USBLogger(id = logger_id, serial_numb = serial_numb)
 		self.metadata = file_basename
+	
+	
 
 
 @dataclass
@@ -170,10 +189,10 @@ class TestColdChainUnit(unittest.TestCase):
 	def tearDown(self):
 		pass
 	
-	@patch('__main__.create_storage_condition_manually')
-	@patch('__main__.get_user_confirmation')
-	@patch('__main__.get_average_temp')
-	@patch('__main__.read')
+	@patch(f'{__name__}.create_storage_condition_manually')
+	@patch(f'{__name__}.get_user_confirmation')
+	@patch(f'{__name__}.get_average_temp')
+	@patch(f'{__name__}.read')
 	def test_create_cc_unit(self,mock_read, mock_get_ave_temp, mock_user_confirmation, mock_manual_create):
 		file = 'dummy.txt'
 		mock_read.return_value = (self.df_temp_data, self.logger_id, self.serial_numb, self.file_basename)
@@ -195,7 +214,7 @@ class TestHelperFunctions(unittest.TestCase):
 	def setUp(self):
 		self.df_temp_data = SAMPLE_DF
 		self.logger_id = 'ACPL01'
-		self.serial_numb = '00001'
+		self.serial_numb = '00000001'
 		self.file_basename = 'ACPL234_ACPL01_09Apr2026'
 	def tearDown(self):
 		pass
@@ -207,47 +226,29 @@ class TestHelperFunctions(unittest.TestCase):
 		self.assertIsNotNone(storage_condit)
 		self.assertEqual(storage_condit.high_alert, 15.0)
 
-	@patch("__main__.pd.read_csv"
-	@patch("__main__.logger")
-	def test_validate(self,mock_logger,mock_read_csv):
-		data_missing_column = { "": ["2020-03-16 10:30:00",
-						"2020-03-16 10:40:00",
-						"2020-03-16 10:50:00"
-            					]
-    					"celsius": [0.0,0.5,1.0]
-					}
+	def test_parse_(self):
+		pass
 
-		data_missing_value = {"date_time": ["",
-						"2020-03-16 10:40:00",
-						"2020-03-16 10:50:00"
-						],
-					"celsius": [0.0,0.5,1.0]
-						}
-		data_empty = {'': []}
-		corrupted_data = [(data_missing_column,'warning','Some columns are missing'),
-				(data_missing_value, 'warning','Some values are missing'),
-				(data_empty, 'warning','Empty dataframe when trying to load file')
-				]
 
-		for data,mock_type,logger_response in corrupted_data:
-			with self.subTest(data,mock_type,logger_response):
-				mock_logger.{mock_type}.return_value = logger_response
-				mock_read_csv.return_value = pf.DataFrame(data)
-				valid_files = validate_([])
-				mock_logger.{mock_type}.assert_called_once_with(logger_response)
+	@patch('os.path.basename')
+	@patch(f'{__name__}.validate_')
+	@patch(f'{__name__}.pd.read_csv')
+	def test_read(self, mock_read_csv, mock_valid_data, mock_basename):
+		mock_valid_data.return_value = 'dummy.txt'
+		mock_read_csv.return_value = pd.DataFrame(self.df_temp_data)
+		mock_basename.return_value = self.file_basename
+		expected_column_names = ['date_time', 'celsius', 'high_alarm', 'low_alarm']
 		
+		df_temp_data,logger_id, serial_numb, file_basename = read('dummy.txt')
+		
+		self.assertEqual(logger_id, "ACP169 BU_FZ156")
+		self.assertEqual(serial_numb,"052297777")
+		self.assertEqual(list(df_temp_data.columns), expected_column_names)
 
 		
 
-stream = io.StringIO()
-loader = unittest.TestLoader()
-suite = unittest.TestSuite([
-    loader.loadTestsFromTestCase(TestHelperFunctions),
-    loader.loadTestsFromTestCase(TestColdChainUnit),
-])
-runner = unittest.TextTestRunner(stream=stream, verbosity=2)
-runner.run(suite)
-print(stream.getvalue())
+if __name__ == '__main__':
+	unittest.main()
 
 
 
