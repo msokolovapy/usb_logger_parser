@@ -6,7 +6,10 @@ import sys
 
 def read(file):
 	valid_file = validate_(file)
-	df= pd.read_csv(valid_file, encoding = 'latin-1')
+	df = pd.read_csv(file, encoding='latin-1',
+			dtype={'Serial Number': str,'Celsius(°C)': float,
+				'High Alarm': float,'Low Alarm': float},
+				converters = {'Time': pd.to_datetime})
 	df_temp_data,logger_id, serial_numb = parse_(df) 
 	file_basename = os.path.basename(file)
 	return df_temp_data,logger_id, serial_numb, file_basename
@@ -15,6 +18,7 @@ def get_average_temp():
 	pass
 
 def parse_(df):
+		df = df.copy()
 		df.rename(columns={'Time': 'date_time',
 			'Celsius(°C)':'celsius',
 			'High Alarm':'high_alarm',
@@ -45,8 +49,8 @@ def validate_(file):
 
 		required_columns = ["Time", "Celsius(°C)"]
 		missing_columns = set(required_columns) - set(df.columns)
-		if missing_columns:
-			logger.warning(f"Some columns are missing: {missing_columns}")
+		if missing_columns:			
+			logger.warning(f"Some columns are missing: {(', ').join(missing_columns)}")
 			sys.exit(1)
 
 		for column in required_columns:

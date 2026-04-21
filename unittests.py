@@ -87,8 +87,6 @@ class TestHelperFunctions(unittest.TestCase):
 		self.assertIsNotNone(storage_condit)
 		self.assertEqual(storage_condit.high_alert, 15.0)
 
-	def test_parse_(self):
-		pass
 
 	@patch('os.path.basename')
 	@patch(f'{__name__}.validate_')
@@ -114,18 +112,37 @@ class TestAnalyticalServiceInit(unittest.TestCase):
 class TestAnalyzeSpikes(unittest.TestCase):
 	def setUp(self):
 		self.analytical_service = AnalyticalService()
+		self.unit = Fridge(*parse_(SAMPLE_DF), 'dummy_txt')
 	def tearDown(self):
 		pass
-	def test_analyze_spikes(self):
-		storage_units = [Mock(), Mock()]
+	
+	
+	
+	@patch('analytical_service.AnalyticalService.add_gap_mins')
+	@patch('analytical_service.AnalyticalService.add_cumulat_spike_id')
+	@patch('analytical_service.AnalyticalService.add_status_column')
+	def test_analyze_spikes(self, mock_add_status, mock_cumulat_id, mock_gap_mins):
+		mock_unit = Mock(temp_data = 'dummy_data', low_alarm = 'low_alarm', high_alarm = 'high_alarm')
+		storage_units = [mock_unit]
+		mock_add_status.side_effect = [Mock(),Mock()]
+		mock_cumulat_id.side_effect = [Mock(), Mock()]
+		mock_gap_mins.side_effect = [{'dict_key': 1}, {'dict_key': 1}]
+
 		spike_dict_list = self.analytical_service.analyze_spikes(storage_units)
-		for dict in spike_dict_list:
+
+		mock_add_status.assert_called_with('dummy_data', 'low_alarm', 'high_alarm')
+
+		for spike_dict in spike_dict_list:
 			with self.subTest(dict):
-				self.assertEqual(list(dict.items()), [('dict_key',1)])
+				self.assertEqual(list(spike_dict.items()), [('dict_key',1)])
+
+		
+
+		print(mock_add_status.call_args_list)
 	def test_add_status_column(self):
-		temp_data = Mock()
-		temp_data_copy = self.analytical_service.add_status_column(temp_data)
-		self.assertIsNot(temp_data, temp_data_copy)
+		self.assertEqual(self.unit.logger.id, 'ACP169 BU_FZ156')
+		df_added_status = self.analytical_service.add_status_column(self.unit.temp_data, self.unit.low_alarm, self.unit.high_alarm)
+		self.assertIn('status', df_added_status.columns)
 
 
 		

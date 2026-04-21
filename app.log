@@ -1,14 +1,4 @@
-2026-04-17 02:49:24,704 - ACPL234_ACPL01_09Apr2026.validate_ - ERROR - Unexpected error (name 'pd' is not defined)occured when trying to load d
-Traceback (most recent call last):
-  File "/workspaces/usb_logger_parser/helper_functions.py", line 40, in validate_
-    df = pd.read_csv(file, encoding='latin-1')
-         ^^
-NameError: name 'pd' is not defined
-2026-04-17 02:57:43,887 - helper_functions.validate_ - ERROR - No file 'd' found
-2026-04-17 02:59:44,379 - helper_functions.validate_ - ERROR - No file 'd' found
-2026-04-17 03:11:56,374 - helper_functions.validate_ - ERROR - No file 'd' found
-2026-04-17 03:13:44,167 - helper_functions.validate_ - ERROR - No file 'd' found
-2026-04-17 03:13:54,198 - helper_functions.validate_ - ERROR - No file 'd' found
-2026-04-17 03:15:58,765 - helper_functions.validate_ - ERROR - No file 'd' found
-2026-04-17 03:20:05,529 - helper_functions.validate_ - ERROR - No file 'dummy.txt' found
-2026-04-17 03:27:08,407 - helper_functions.validate_ - ERROR - No file 'dummy.txt' found
+
+2026-04-21 02:26:18,743 - ACPL234_ACPL01_09Apr2026.validate_ - WARNING - Some columns are missing: Celsius(°C), Time
+2026-04-21 03:06:09,285 - ACPL234_ACPL01_09Apr2026.validate_ - WARNING - Some columns are missing: Time, Celsius(°C)
+2026-04-21 03:13:40,517 - ACPL234_ACPL01_09Apr2026.validate_ - WARNING - Some columns are missing: Time, Celsius(°C)
