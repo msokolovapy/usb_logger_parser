@@ -122,27 +122,68 @@ class TestAnalyzeSpikes(unittest.TestCase):
 	@patch('analytical_service.AnalyticalService.add_cumulat_spike_id')
 	@patch('analytical_service.AnalyticalService.add_status_column')
 	def test_analyze_spikes(self, mock_add_status, mock_cumulat_id, mock_gap_mins):
-		mock_unit = Mock(temp_data = 'dummy_data', low_alarm = 'low_alarm', high_alarm = 'high_alarm')
-		storage_units = [mock_unit]
-		mock_add_status.side_effect = [Mock(),Mock()]
-		mock_cumulat_id.side_effect = [Mock(), Mock()]
-		mock_gap_mins.side_effect = [{'dict_key': 1}, {'dict_key': 1}]
+		storage_units = [Mock(temp_data = 'dummy_data', low_alarm = 'low_alarm', high_alarm = 'high_alarm')]
+		mock_add_status.side_effect = ['df_added_status']
+		mock_cumulat_id.side_effect = ['df_with_cumulat_spike_id']
 
 		spike_dict_list = self.analytical_service.analyze_spikes(storage_units)
 
 		mock_add_status.assert_called_with('dummy_data', 'low_alarm', 'high_alarm')
+		mock_cumulat_id.assert_called_with('df_added_status')
+		mock_gap_mins.assert_called_with('df_with_cumulat_spike_id')
 
 		for spike_dict in spike_dict_list:
 			with self.subTest(dict):
-				self.assertEqual(list(spike_dict.items()), [('dict_key',1)])
+				self.fail("FINISH TESTING .analyze_spikes !")
 
-		
-
-		print(mock_add_status.call_args_list)
 	def test_add_status_column(self):
-		self.assertEqual(self.unit.logger.id, 'ACP169 BU_FZ156')
-		df_added_status = self.analytical_service.add_status_column(self.unit.temp_data, self.unit.low_alarm, self.unit.high_alarm)
+		sample_df = pd.DataFrame({'date_time':["2020-03-16 10:30:00",
+       											 "2020-03-16 10:40:00",
+												"2020-03-16 10:50:00",
+												"2020-03-16 11:00:00",
+												"2020-03-16 11:10:00",
+												"2020-03-16 11:20:00",
+												"2020-03-16 11:30:00",
+												"2020-03-16 11:40:00"
+												], 
+												'celsius':[0.0,0.5,1.0,1.5,2.0,2.5,3.5,4.5]})
+		df_added_status = self.analytical_service.add_status_column(sample_df, self.unit.low_alarm, self.unit.high_alarm)
 		self.assertIn('status', df_added_status.columns)
+
+	def test_add_cumulat_spike_id(self):
+		sample_df = pd.DataFrame({'date_time':["2020-03-16 10:30:00",
+       											 "2020-03-16 10:40:00",
+												"2020-03-16 10:50:00",
+												"2020-03-16 11:00:00",
+												"2020-03-16 11:10:00",
+												"2020-03-16 11:20:00",
+												"2020-03-16 11:30:00",
+												"2020-03-16 11:40:00"
+												], 
+												'celsius':[0.0,0.5,1.0,1.5,2.0,2.5,3.5,4.5],
+												'status': ['too_low', 'too_low', 'too_low', 'too_low', None, None, None, None]})
+		df_cumulat_spike_id = self.analytical_service.add_cumulat_spike_id(sample_df)
+		self.assertIn('cumulat_spike_id', df_cumulat_spike_id.columns)
+		self.assertEqual(df_cumulat_spike_id['cumulat_spike_id'][0],1)
+
+	def test_add_gap_mins(self):
+		sample_df = pd.DataFrame({'date_time':["2020-03-16 10:30:00",
+       											"2020-03-16 10:40:00",
+												"2020-03-16 10:50:00",
+												"2020-03-16 11:00:00",
+												"2020-03-16 11:10:00",
+												"2020-03-16 11:20:00",
+												"2020-03-16 11:30:00",
+												"2020-03-16 11:40:00"
+												], 
+											
+	 									'cumulat_spike_id': [1, 1, 1, 1, 2, 3,  4, 5]}
+										)
+		sample_df['date_time'] = pd.to_datetime(sample_df['date_time'])
+		df = self.analytical_service.add_gap_mins(sample_df)
+		self.assertIn('reading_gap_mins', df.columns)
+		self.assertTrue((df['reading_gap_mins'] == 10).any())
+
 
 
 		
@@ -152,11 +193,6 @@ class TestAnalyzeSpikes(unittest.TestCase):
 
 if __name__ == '__main__':
 	unittest.main()
-
-
-
-
-
 
 
 
