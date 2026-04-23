@@ -34,21 +34,23 @@ class AnalyticalService():
     def prepare_df_last_spike_of_day(self, df):
         """returns dataframe where: last spike of the day is determined and 24hr window before the last spike is defined. Will be used to 
         determine total spikes duration"""
+        df = self.filter(df)
         df = self.add_last_spike_check(df)
         df = self.prepare_24hr_window_start(df)
         df = self.group_data(df)
         return df
 
+    def filter(self, df):
+        filtered_df = df[df['status'].isin(['too_high', 'too_low'])][['cumulat_spike_id','date_time','celsius','status']]
+        return filtered_df
 
-    def add_last_spike_check(self, df)
-        """returns dataframe where last spike of the day is either True or False"""
-        df_filtered = df[
-                                df['status'].isin(['too_high', 'too_low'])]
-                                [['cumulat_spike_id','date_time','celsius','status']]
+
+    def add_last_spike_check(self, df_filtered):
+        """returns dataframe where last spike of the day is defined as True if """
         df_filtered['last_spike_of_day'] = ((df_filtered['date_time'].dt.date != df_filtered['date_time'].dt.date.shift(-1)))
         return df_filtered
 
-    def prepare_24hr_window_start(self, df)
+    def prepare_24hr_window_start(self, df):
         """returns dataframe where the 24hr window start (based on the last spike of the day) is
         defined"""
         df['24hr_window_start'] = pd.to_datetime(np.where(
@@ -58,11 +60,8 @@ class AnalyticalService():
                                                         ))
         return df
 
-    def group_data(self,df)
-        df_last_spike_of_day = df[
-                                        df['last_spike_of_day']==True]
-                                        [['cumulat_spike_id','date_time','last_spike_of_day','24hr_window_start']
-                                        ]
+    def group_data(self,df):
+        df_last_spike_of_day = df[df['last_spike_of_day']==True][['cumulat_spike_id','date_time','last_spike_of_day','24hr_window_start']]
 
         return df_last_spike_of_day
 

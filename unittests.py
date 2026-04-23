@@ -122,13 +122,13 @@ class TestAnalyzeSpikes(unittest.TestCase):
 	@patch('analytical_service.AnalyticalService.add_cumulat_spike_id')
 	@patch('analytical_service.AnalyticalService.add_status_column')
 	def test_analyze_spikes(self, mock_add_status, mock_cumulat_id, mock_gap_mins):
-		storage_units = [Mock(temp_data = 'dummy_data', low_alarm = 'low_alarm', high_alarm = 'high_alarm')]
+		storage_units = [Mock(temp_data = {'dummy_column': 'dummy_value'}, low_alarm = 'low_alarm', high_alarm = 'high_alarm')]
 		mock_add_status.side_effect = ['df_added_status']
 		mock_cumulat_id.side_effect = ['df_with_cumulat_spike_id']
 
 		spike_dict_list = self.analytical_service.analyze_spikes(storage_units)
 
-		mock_add_status.assert_called_with('dummy_data', 'low_alarm', 'high_alarm')
+		mock_add_status.assert_called_with({'dummy_column': 'dummy_value'}, 'low_alarm', 'high_alarm')
 		mock_cumulat_id.assert_called_with('df_added_status')
 		mock_gap_mins.assert_called_with('df_with_cumulat_spike_id')
 
@@ -137,37 +137,10 @@ class TestAnalyzeSpikes(unittest.TestCase):
 				self.fail("FINISH TESTING .analyze_spikes !")
 
 	def test_add_status_column(self):
-		sample_df = pd.DataFrame({'date_time':["2020-03-16 10:30:00",
-       											 "2020-03-16 10:40:00",
-												"2020-03-16 10:50:00",
-												"2020-03-16 11:00:00",
-												"2020-03-16 11:10:00",
-												"2020-03-16 11:20:00",
-												"2020-03-16 11:30:00",
-												"2020-03-16 11:40:00"
-												], 
-												'celsius':[0.0,0.5,1.0,1.5,2.0,2.5,3.5,4.5]})
-		df_added_status = self.analytical_service.add_status_column(sample_df, self.unit.low_alarm, self.unit.high_alarm)
-		self.assertIn('status', df_added_status.columns)
-
-	def test_add_cumulat_spike_id(self):
-		sample_df = pd.DataFrame({'date_time':["2020-03-16 10:30:00",
-       											 "2020-03-16 10:40:00",
-												"2020-03-16 10:50:00",
-												"2020-03-16 11:00:00",
-												"2020-03-16 11:10:00",
-												"2020-03-16 11:20:00",
-												"2020-03-16 11:30:00",
-												"2020-03-16 11:40:00"
-												], 
-												'celsius':[0.0,0.5,1.0,1.5,2.0,2.5,3.5,4.5],
-												'status': ['too_low', 'too_low', 'too_low', 'too_low', None, None, None, None]})
-		df_cumulat_spike_id = self.analytical_service.add_cumulat_spike_id(sample_df)
-		self.assertIn('cumulat_spike_id', df_cumulat_spike_id.columns)
-		self.assertEqual(df_cumulat_spike_id['cumulat_spike_id'][0],1)
-
-	def test_add_gap_mins(self):
-		sample_df = pd.DataFrame({'date_time':["2020-03-16 10:30:00",
+		sample_df = pd.DataFrame({'date_time':["2020-03-15 10:20:00",
+												"2020-03-15 10:30:00",
+												"2020-03-15 10:40:00",
+												"2020-03-16 10:30:00",
        											"2020-03-16 10:40:00",
 												"2020-03-16 10:50:00",
 												"2020-03-16 11:00:00",
@@ -176,16 +149,92 @@ class TestAnalyzeSpikes(unittest.TestCase):
 												"2020-03-16 11:30:00",
 												"2020-03-16 11:40:00"
 												], 
-											
-	 									'cumulat_spike_id': [1, 1, 1, 1, 2, 3,  4, 5]}
-										)
+												'celsius':[16.0,20.0,16.0,5.0,0.0,0.5,1.0,1.5,2.0,2.5,3.5]
+												})
+		df_added_status = self.analytical_service.add_status_column(sample_df, self.unit.low_alarm, self.unit.high_alarm)
+		self.assertIn('status', df_added_status.columns)
+
+	def test_add_cumulat_spike_id(self):
+		sample_df = pd.DataFrame({'date_time':["2020-03-15 10:20:00",
+												"2020-03-15 10:30:00",
+												"2020-03-15 10:40:00",
+												"2020-03-16 10:30:00",
+       											"2020-03-16 10:40:00",
+												"2020-03-16 10:50:00",
+												"2020-03-16 11:00:00",
+												"2020-03-16 11:10:00",
+												"2020-03-16 11:20:00",
+												"2020-03-16 11:30:00",
+												"2020-03-16 11:40:00"
+												], 
+												'celsius':[16.0,20.0,16.0,5.0,0.0,0.5,1.0,1.5,2.0,2.5,3.5],
+												'status': ['too_high', 'too_high', 'too_high', None, 
+															'too_low', 'too_low', 'too_low', 'too_low', None, None, None]
+												})
+		df_cumulat_spike_id = self.analytical_service.add_cumulat_spike_id(sample_df)
+		self.assertIn('cumulat_spike_id', df_cumulat_spike_id.columns)
+		self.assertEqual(df_cumulat_spike_id['cumulat_spike_id'][0],1)
+
+	def test_add_gap_mins(self):
+		sample_df = pd.DataFrame({'date_time':["2020-03-15 10:20:00",
+												"2020-03-15 10:30:00",
+												"2020-03-15 10:40:00",
+												"2020-03-16 10:30:00",
+       											"2020-03-16 10:40:00",
+												"2020-03-16 10:50:00",
+												"2020-03-16 11:00:00",
+												"2020-03-16 11:10:00",
+												"2020-03-16 11:20:00",
+												"2020-03-16 11:30:00",
+												"2020-03-16 11:40:00"
+												], 
+												'cumulat_spike_id': [1, 1, 1, 2, 3, 3, 3, 3, 4, 5, 6]
+												})
 		sample_df['date_time'] = pd.to_datetime(sample_df['date_time'])
 		df = self.analytical_service.add_gap_mins(sample_df)
+
 		self.assertIn('reading_gap_mins', df.columns)
 		self.assertTrue((df['reading_gap_mins'] == 10).any())
 
+	def test_filter(self):
+		sample_df = pd.DataFrame({'date_time':["2020-03-15 10:20:00",
+												"2020-03-15 10:30:00",
+												"2020-03-15 10:40:00",
+												"2020-03-16 10:30:00",
+       											"2020-03-16 10:40:00",
+												"2020-03-16 10:50:00",
+												"2020-03-16 11:00:00",
+												"2020-03-16 11:10:00",
+												"2020-03-16 11:20:00",
+												"2020-03-16 11:30:00",
+												"2020-03-16 11:40:00"
+												], 
+												'celsius':[16.0,20.0,16.0,5.0,0.0,0.5,1.0,1.5,2.0,2.5,3.5],
+												'status': ['too_high', 'too_high', 'too_high', None, 
+															'too_low', 'too_low', 'too_low', 'too_low', 
+															None, None, None],
+												'cumulat_spike_id': [1, 1, 1, 2, 3, 3, 3, 3, 4, 5, 6]
+												})
 
+		df_filtered = self.analytical_service.filter(sample_df)
+		# print(df_filtered.to_dict(orient='list'))
+		self.assertTrue((df_filtered['status']!=None).all())
+	
+	def test_add_last_spike_check(self):
+		sample_df = pd.DataFrame({'cumulat_spike_id': [1, 1, 1, 3, 3, 3, 3],
+								 'date_time': ['2020-03-15 10:20:00', '2020-03-15 10:30:00', 
+								 '2020-03-15 10:40:00', '2020-03-16 10:40:00', 
+								 '2020-03-16 10:50:00', '2020-03-16 11:00:00', 
+								 '2020-03-16 11:10:00'], 
+								 'celsius': [16.0, 20.0, 16.0, 0.0, 0.5, 1.0, 1.5], 
+								 'status': ['too_high', 'too_high', 'too_high', 'too_low', 'too_low', 'too_low', 'too_low']})
+		sample_df['date_time'] = pd.to_datetime(sample_df['date_time'])
+		
+		df_last_spike = self.analytical_service.add_last_spike_check(sample_df)
+		self.assertEqual(df_last_spike['last_spike_of_day'].to_list(), [False, False, True, False, False, False, True])
 
+	def test_prepare_24hr_window_start(self):
+		self.fail('finish test')
 		
 
 
