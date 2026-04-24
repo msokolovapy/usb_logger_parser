@@ -2,6 +2,7 @@ import unittest
 from unittest.mock import Mock
 from unittest.mock import patch
 import pandas as pd
+from pandas import Timestamp
 from app import logger
 from storage_units import StorageCondition, Fridge, create_storage_condition_manually
 from helper_functions import read, parse_, get_user_confirmation, validate_, get_average_temp
@@ -195,6 +196,26 @@ class TestAnalyzeSpikes(unittest.TestCase):
 
 		self.assertIn('reading_gap_mins', df.columns)
 		self.assertTrue((df['reading_gap_mins'] == 10).any())
+		
+	def test_prepare_df_last_spike_of_day(self):
+		with patch.object(AnalyticalService, 'filter') as mock_filter,\
+				patch.object(AnalyticalService, 'add_last_spike_check') as mock_last_spike,\
+				patch.object(AnalyticalService, 'prepare_24hr_window_start') as mock_24hr_window,\
+				patch.object(AnalyticalService, 'group_data') as mock_group:
+			mock_filter.return_value = 'filtered_df'
+			mock_last_spike.return_value = 'last_spike_added'
+			mock_24hr_window.return_value = '24hr_window_added'
+			mock_group.return_value = 'df_transformed_and_grouped'
+
+			last_spike_df = self.analytical_service.prepare_df_last_spike_of_day('original_df')
+
+			mock_filter.assert_called_with('original_df')
+			mock_last_spike.assert_called_with('filtered_df')
+			mock_24hr_window.assert_called_with('last_spike_added')
+			mock_group.assert_called_with('24hr_window_added')
+
+			self.assertEqual(last_spike_df, 'df_transformed_and_grouped')
+
 
 	def test_filter(self):
 		sample_df = pd.DataFrame({'date_time':["2020-03-15 10:20:00",
@@ -234,7 +255,53 @@ class TestAnalyzeSpikes(unittest.TestCase):
 		self.assertEqual(df_last_spike['last_spike_of_day'].to_list(), [False, False, True, False, False, False, True])
 
 	def test_prepare_24hr_window_start(self):
-		self.fail('finish test')
+		sample_df = pd.DataFrame({
+								'cumulat_spike_id': [1, 1, 1, 3, 3, 3, 3],
+								'date_time': [
+								Timestamp('2020-03-15 10:20:00'), Timestamp('2020-03-15 10:30:00'),
+								Timestamp('2020-03-15 10:40:00'), Timestamp('2020-03-16 10:40:00'),
+								Timestamp('2020-03-16 10:50:00'), Timestamp('2020-03-16 11:00:00'), 
+								Timestamp('2020-03-16 11:10:00')
+								], 
+							'celsius': [16.0, 20.0, 16.0, 0.0, 0.5, 1.0, 1.5], 
+							'status': ['too_high', 'too_high', 'too_high', 'too_low', 'too_low', 'too_low', 'too_low'], 
+							'last_spike_of_day': [False, False, True, False, False, False, True]})
+		expected_values = [Timestamp('2020-03-14 10:20:00'), Timestamp('2020-03-14 10:30:00'),
+						Timestamp('2020-03-14 10:40:00'), Timestamp('2020-03-15 10:40:00'), 
+						Timestamp('2020-03-15 10:50:00'), Timestamp('2020-03-15 11:00:00'), 
+						Timestamp('2020-03-15 11:10:00')]
+
+		df_24hr_window = self.analytical_service.prepare_24hr_window_start(sample_df)
+		self.assertEqual(df_24hr_window['24hr_window_start'].to_list(), expected_values)
+	
+
+
+	def test_group_data(self):
+		sample_df = pd.DataFrame({
+								'cumulat_spike_id': [1, 1, 1, 3, 3, 3, 3],
+								'date_time': [
+								Timestamp('2020-03-15 10:20:00'), Timestamp('2020-03-15 10:30:00'),
+								Timestamp('2020-03-15 10:40:00'), Timestamp('2020-03-16 10:40:00'),
+								Timestamp('2020-03-16 10:50:00'), Timestamp('2020-03-16 11:00:00'), 
+								Timestamp('2020-03-16 11:10:00')
+								], 
+							'celsius': [16.0, 20.0, 16.0, 0.0, 0.5, 1.0, 1.5], 
+							'status': ['too_high', 'too_high', 'too_high', 'too_low', 'too_low', 'too_low', 'too_low'], 
+							'last_spike_of_day': [False, False, True, False, False, False, True],
+							'24hr_window_start': [
+								Timestamp('2020-03-14 10:20:00'), Timestamp('2020-03-14 10:30:00'), 
+								Timestamp('2020-03-14 10:40:00'), Timestamp('2020-03-15 10:40:00'), 
+								Timestamp('2020-03-15 10:50:00'), Timestamp('2020-03-15 11:00:00'), 
+								Timestamp('2020-03-15 11:10:00')]
+							})
+		df_grouped = self.analytical_service.group_data(sample_df)
+		expected_columns = ['cumulat_spike_id','date_time','last_spike_of_day','24hr_window_start']
+
+		self.assertTrue((df_grouped['last_spike_of_day'] == True).all())
+		self.assertEqual(list(df_grouped.columns),expected_columns)
+		
+
+		
 		
 
 
