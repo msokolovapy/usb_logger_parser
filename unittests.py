@@ -189,7 +189,9 @@ class TestAnalyzeSpikes(unittest.TestCase):
 												"2020-03-16 11:30:00",
 												"2020-03-16 11:40:00"
 												], 
-												'cumulat_spike_id': [1, 1, 1, 2, 3, 3, 3, 3, 4, 5, 6]
+												'cumulat_spike_id': [1, 1, 1, 2, 3, 3, 3, 3, 4, 5, 6],
+												'status': ['too_high', 'too_high', 'too_high', None, 
+															'too_low', 'too_low', 'too_low', 'too_low', None, None, None]
 												})
 		sample_df['date_time'] = pd.to_datetime(sample_df['date_time'])
 		df = self.analytical_service.add_gap_mins(sample_df)
@@ -198,26 +200,29 @@ class TestAnalyzeSpikes(unittest.TestCase):
 		self.assertTrue((df['reading_gap_mins'] == 10).any())
 		
 	def test_prepare_df_last_spike_of_day(self):
-		with patch.object(AnalyticalService, 'filter') as mock_filter,\
+		with patch.object(AnalyticalService, 'filter_by_status') as mock_status_filter,\
 				patch.object(AnalyticalService, 'add_last_spike_check') as mock_last_spike,\
 				patch.object(AnalyticalService, 'prepare_24hr_window_start') as mock_24hr_window,\
-				patch.object(AnalyticalService, 'group_data') as mock_group:
-			mock_filter.return_value = 'filtered_df'
+				patch.object(AnalyticalService, 'filter_by_last_spike') as mock_spike_filter,\
+				patch.object(AnalyticalService, 'determine_spike_duration_24hr_mins') as mock_last_spike_df:
+			mock_status_filter.return_value = 'df_filtered_by_status'
 			mock_last_spike.return_value = 'last_spike_added'
 			mock_24hr_window.return_value = '24hr_window_added'
-			mock_group.return_value = 'df_transformed_and_grouped'
+			mock_spike_filter.return_value = 'df_filtered_by_last_spike'
+			mock_last_spike_df.return_value = 'df_spike_duration_24hr_added'
 
 			last_spike_df = self.analytical_service.prepare_df_last_spike_of_day('original_df')
 
-			mock_filter.assert_called_with('original_df')
-			mock_last_spike.assert_called_with('filtered_df')
+			mock_status_filter.assert_called_with('original_df')
+			mock_last_spike.assert_called_with('df_filtered_by_status')
 			mock_24hr_window.assert_called_with('last_spike_added')
-			mock_group.assert_called_with('24hr_window_added')
+			mock_spike_filter.assert_called_with('24hr_window_added')
+			mock_last_spike_df.assert_called_with('df_filtered_by_last_spike','original_df')
 
-			self.assertEqual(last_spike_df, 'df_transformed_and_grouped')
+			self.assertEqual(last_spike_df, 'df_spike_duration_24hr_added')
 
 
-	def test_filter(self):
+	def test_filter_by_status(self):
 		sample_df = pd.DataFrame({'date_time':["2020-03-15 10:20:00",
 												"2020-03-15 10:30:00",
 												"2020-03-15 10:40:00",
@@ -237,8 +242,7 @@ class TestAnalyzeSpikes(unittest.TestCase):
 												'cumulat_spike_id': [1, 1, 1, 2, 3, 3, 3, 3, 4, 5, 6]
 												})
 
-		df_filtered = self.analytical_service.filter(sample_df)
-		# print(df_filtered.to_dict(orient='list'))
+		df_filtered = self.analytical_service.filter_by_status(sample_df)
 		self.assertTrue((df_filtered['status']!=None).all())
 	
 	def test_add_last_spike_check(self):
@@ -276,7 +280,7 @@ class TestAnalyzeSpikes(unittest.TestCase):
 	
 
 
-	def test_group_data(self):
+	def test_filter_by_spike(self):
 		sample_df = pd.DataFrame({
 								'cumulat_spike_id': [1, 1, 1, 3, 3, 3, 3],
 								'date_time': [
@@ -294,12 +298,34 @@ class TestAnalyzeSpikes(unittest.TestCase):
 								Timestamp('2020-03-15 10:50:00'), Timestamp('2020-03-15 11:00:00'), 
 								Timestamp('2020-03-15 11:10:00')]
 							})
-		df_grouped = self.analytical_service.group_data(sample_df)
+		df_grouped = self.analytical_service.filter_by_last_spike(sample_df)
 		expected_columns = ['cumulat_spike_id','date_time','last_spike_of_day','24hr_window_start']
 
 		self.assertTrue((df_grouped['last_spike_of_day'] == True).all())
 		self.assertEqual(list(df_grouped.columns),expected_columns)
 		
+	def test_determine_spike_duration_24hr_mins(self):
+		sample_df_24hr_spikes = pd.DataFrame({'date_time':[Timestamp('2020-03-16 11:10:00')], '24hr_window_start': [Timestamp('2020-03-15 11:10:00')]})
+		sample_df = pd.DataFrame({'date_time': [Timestamp('2020-03-15 10:20:00'), Timestamp('2020-03-15 10:30:00'), 
+									Timestamp('2020-03-15 10:40:00'), Timestamp('2020-03-16 10:30:00'), 
+									Timestamp('2020-03-16 10:40:00'), Timestamp('2020-03-16 10:50:00'), 
+									Timestamp('2020-03-16 11:00:00'), Timestamp('2020-03-16 11:10:00'), 
+									Timestamp('2020-03-16 11:20:00'), Timestamp('2020-03-16 11:30:00'), 
+									Timestamp('2020-03-16 11:40:00')],
+		'status': ['too_high', 'too_high', 'too_high', None, 'too_low', 'too_low', 'too_low', 'too_low', None, None, None], 
+		'reading_gap_mins': [None, 10.0, 10.0, None, None, 10.0, 10.0, 10.0, None, None, None]})
+
+		df = self.analytical_service.determine_spike_duration_24hr_mins(sample_df_24hr_spikes, sample_df)
+		self.assertEqual(df['spike_duration_24hr_mins'].item(), 30.0)
+
+		with patch.object(AnalyticalService,'spike_duration_in_24hr_window', return_value = 10.0, autospec = True) as mock_spike_duration:
+			df = self.analytical_service.determine_spike_duration_24hr_mins(sample_df_24hr_spikes, sample_df)
+			mock_spike_duration.assert_called_once()
+			
+
+			
+
+
 
 		
 		

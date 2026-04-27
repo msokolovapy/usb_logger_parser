@@ -14,7 +14,7 @@ class AnalyticalService():
             df = self.add_status_column(df, unit.low_alarm, unit.high_alarm)
             df = self.add_cumulat_spike_id(df)
             df = self.add_gap_mins(df)
-            df_last_spike = self.test_prepare_df_last_spike_of_day(df)
+            df_last_spike = self.prepare_df_last_spike_of_day(df)
             spike_dict = {}
             spike_dict_list.append(spike_dict)
         return spike_dict_list
@@ -36,8 +36,8 @@ class AnalyticalService():
         return df
 
     def prepare_df_last_spike_of_day(self, df):
-        """returns dataframe where: last spike of the day is determined and 24hr window before the last spike is defined. Will be used to 
-        determine total spikes duration"""
+        """returns dataframe where: last spike of the day is determined, 24hr window before the last spike is defined 
+        and total duration of temp spikes is determined."""
         df_original = df
         df_last_spike = self.filter_by_status(df)
         df_last_spike = self.add_last_spike_check(df_last_spike)
@@ -80,9 +80,10 @@ class AnalyticalService():
         
         return filtered['reading_gap_mins'].sum()
 
-    def determine_spike_duration_24hr_mins(self,df_last_spike, df_original)
+    def determine_spike_duration_24hr_mins(self,df_last_spike, df_original):
         df_last_spike['spike_duration_24hr_mins'] = df_last_spike.apply(
             self.spike_duration_in_24hr_window, axis=1, temp_data=df_original
         )
-        return df_last_spke
+        return df_last_spike
+
 
