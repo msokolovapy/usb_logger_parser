@@ -1,4 +1,4 @@
-from helper_functions import parse_
+from helper_functions import parse_, get_extreme_date_time, get_extreme_temp, get_spike_duration
 import pandas as pd
 
 
@@ -85,5 +85,17 @@ class AnalyticalService():
             self.spike_duration_in_24hr_window, axis=1, temp_data=df_original
         )
         return df_last_spike
+
+
+    def get_extremes_info(self, df):
+        df_extremes = df[df['status'].isin(['too_high', 'too_low'])].
+                                            groupby('cumulat_spike_id').
+                                            agg(extreme_temp=('celsius', lambda x: x.loc[x.abs().idxmax()]),
+                                                extreme_date_time=('date_time', lambda x: get_extreme_date_time(x, df)),
+                                                spike_duration_mins =('date_time', lambda x: get_spike_duration(x))
+                                                )
+        return df_extremes
+        
+
 
 

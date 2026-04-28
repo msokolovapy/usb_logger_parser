@@ -316,7 +316,7 @@ class TestAnalyzeSpikes(unittest.TestCase):
 		'reading_gap_mins': [None, 10.0, 10.0, None, None, 10.0, 10.0, 10.0, None, None, None]})
 
 		df = self.analytical_service.determine_spike_duration_24hr_mins(sample_df_24hr_spikes, sample_df)
-		self.assertEqual(df['spike_duration_24hr_mins'].item(), 30.0)
+		self.assertEqual(df['spike_duration_24hr_mins'][0], 30.0)
 
 		with patch.object(AnalyticalService,'spike_duration_in_24hr_window', return_value = 10.0, autospec = True) as mock_spike_duration:
 			df = self.analytical_service.determine_spike_duration_24hr_mins(sample_df_24hr_spikes, sample_df)
