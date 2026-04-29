@@ -5,7 +5,7 @@ import pandas as pd
 from pandas import Timestamp
 from app import logger
 from storage_units import StorageCondition, Fridge, create_storage_condition_manually
-from helper_functions import read, parse_, get_user_confirmation, validate_, get_average_temp
+from helper_functions import read, parse_, get_user_confirmation, validate_, get_average_temp, get_extreme_date_time, get_extreme_temp, get_spike_duration
 from analytical_service import AnalyticalService
 
 
@@ -103,6 +103,30 @@ class TestHelperFunctions(unittest.TestCase):
 		self.assertEqual(logger_id, "ACP169 BU_FZ156")
 		self.assertEqual(serial_numb,"052297777")
 		self.assertEqual(list(df_temp_data.columns), expected_column_names)
+	
+	def test_get_extreme_temp(self):
+		sample_df_slice = pd.DataFrame({'celsius': [-25.0, -26.0, -24.0, -23.0]})
+		extreme_temp = get_extreme_temp(sample_df_slice).iloc[0, 0]
+
+		self.assertEqual(extreme_temp, -26.0)
+
+	def test_get_extreme_date_time(self):
+		sample_df_slice = pd.DataFrame({'date_time': [Timestamp('2020-03-15 10:20:00'), Timestamp('2020-03-15 10:30:00'),
+								Timestamp('2020-03-15 10:40:00'), Timestamp('2020-03-16 10:40:00')]})
+		sample_df = pd.DataFrame({'date_time': [Timestamp('2020-03-15 10:20:00'), Timestamp('2020-03-15 10:30:00'),
+								Timestamp('2020-03-15 10:40:00'), Timestamp('2020-03-16 10:40:00')],
+								'celsius': [-25.0, -26.0, -24.0, -23.0]}
+								)
+		
+		extreme_date_time = get_extreme_date_time(sample_df_slice, sample_df).iloc[0]
+		self.assertEqual(extreme_date_time, Timestamp('2020-03-15 10:30:00'))
+
+	def test_get_spike_duration(self):
+		sample_df_slice = pd.DataFrame({'date_time': [Timestamp('2020-03-15 10:20:00'), Timestamp('2020-03-15 10:30:00'),
+								Timestamp('2020-03-15 10:40:00'), Timestamp('2020-03-16 10:40:00')]})
+		spike_duration = get_spike_duration(sample_df_slice).iloc[0]
+		self.assertEqual(spike_duration, 1460)
+
 
 
 class TestAnalyticalServiceInit(unittest.TestCase):

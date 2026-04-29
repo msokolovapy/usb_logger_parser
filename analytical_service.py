@@ -88,12 +88,11 @@ class AnalyticalService():
 
 
     def get_extremes_info(self, df):
-        df_extremes = df[df['status'].isin(['too_high', 'too_low'])].
-                                            groupby('cumulat_spike_id').
-                                            agg(extreme_temp=('celsius', lambda x: x.loc[x.abs().idxmax()]),
-                                                extreme_date_time=('date_time', lambda x: get_extreme_date_time(x, df)),
-                                                spike_duration_mins =('date_time', lambda x: get_spike_duration(x))
-                                                )
+        df_extremes = df[df['status'].isin(['too_high', 'too_low'])].groupby('cumulat_spike_id').agg(
+                                                                                                    extreme_temp=('celsius', lambda x: get_extreme_temp(x)),
+                                                                                                    extreme_date_time=('date_time', lambda x: get_extreme_date_time(x, df)),
+                                                                                                    spike_duration_mins =('date_time', lambda x: get_spike_duration(x))
+                                                                                                    )
         return df_extremes
         
 

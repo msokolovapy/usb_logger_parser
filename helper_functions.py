@@ -66,15 +66,15 @@ def validate_(file):
 	sys.exit(1)
 
 
-def get_spike_duration(x):
-	spike_duration = ((x.max() - x.min()).dt.total_seconds()/60).astype(int)
+def get_spike_duration(pandas_series_date_time):
+	spike_duration = ((pandas_series_date_time.max() - pandas_series_date_time.min()).dt.total_seconds()/60).astype(int)
 	return spike_duration
 
-def get_extreme_date_time(x, df):
-	filtered = df.loc[x.index, 'celsius']
+def get_extreme_date_time(pandas_series_date_time, df):
+	filtered = df.loc[pandas_series_date_time.index, 'celsius']
 	mask = filtered.abs().idxmax()
-	return x.loc[mask]
+	return pandas_series_date_time.loc[mask]
 
-def get_extreme_temp(x):
-	mask = x.abs().idxmax()
-	return x.loc[mask]
+def get_extreme_temp(pandas_series_celsius):
+	mask = pandas_series_celsius.abs().idxmax()
+	return pandas_series_celsius.loc[mask]
