@@ -13,9 +13,9 @@ class AnalyticalService():
             df = unit.temp_data.copy()
             df = self.add_status_column(df, unit.low_alarm, unit.high_alarm)
             df = self.add_cumulat_spike_id(df)
-            df = self.add_gap_mins(df)
-            df_last_spike = self.prepare_df_last_spike_of_day(df)
-            spike_dict = {}
+            df_total_spike_duration = self.prepare_df_last_spike_of_day(df)
+            df_excursions = self.get_extremes_info(df)
+            spike_dict = self.prepare_excursions_dict(df_total_spike_duration, df_excursions)
             spike_dict_list.append(spike_dict)
         return spike_dict_list
 
@@ -39,7 +39,8 @@ class AnalyticalService():
         """returns dataframe where: last spike of the day is determined, 24hr window before the last spike is defined 
         and total duration of temp spikes is determined."""
         df_original = df
-        df_last_spike = self.filter_by_status(df)
+        df_last_spike = self.add_gap_mins(df_original)
+        df_last_spike = self.filter_by_status(df_last_spike)
         df_last_spike = self.add_last_spike_check(df_last_spike)
         df_last_spike = self.prepare_24hr_window_start(df_last_spike)
         df_last_spike = self.filter_by_last_spike(df_last_spike)
@@ -94,7 +95,12 @@ class AnalyticalService():
                                                                                                     spike_duration_mins =('date_time', lambda x: get_spike_duration(x))
                                                                                                     )
         return df_extremes
-        
+
+    
+    def prepare_excursions_dict(self,df_total_spike_duration, df_excursions):
+        df_filtered = df_total_spike_duration[['cumulat_spike_id', 'spike_duration_24hr_mins']]
+        df_merged = df_excursions.merge(df_filtered, on = 'cumulat_spike_id', how = 'left')
+        return df_merged
 
 
 

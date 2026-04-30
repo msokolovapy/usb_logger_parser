@@ -67,7 +67,7 @@ def validate_(file):
 
 
 def get_spike_duration(pandas_series_date_time):
-	spike_duration = ((pandas_series_date_time.max() - pandas_series_date_time.min()).dt.total_seconds()/60).astype(int)
+	spike_duration = int((pandas_series_date_time.max() - pandas_series_date_time.min()).total_seconds()/60)
 	return spike_duration
 
 def get_extreme_date_time(pandas_series_date_time, df):
