@@ -342,26 +342,37 @@ class TestAnalyzeSpikes(unittest.TestCase):
 		self.assertTrue((df_grouped['last_spike_of_day'] == True).all())
 		self.assertEqual(list(df_grouped.columns),expected_columns)
 		
-	def test_determine_spike_duration_24hr_mins(self):
-		sample_df_24hr_spikes = pd.DataFrame({'date_time':[Timestamp('2020-03-16 11:10:00')], '24hr_window_start': [Timestamp('2020-03-15 11:10:00')]})
-		sample_df = pd.DataFrame({'date_time': [Timestamp('2020-03-15 10:20:00'), Timestamp('2020-03-15 10:30:00'), 
+	def test_spike_duration_in_24hr_window(self):
+		df = pd.DataFrame({
+							'date_time': [Timestamp('2020-03-15 10:20:00'), Timestamp('2020-03-15 10:30:00'), 
 									Timestamp('2020-03-15 10:40:00'), Timestamp('2020-03-16 10:30:00'), 
 									Timestamp('2020-03-16 10:40:00'), Timestamp('2020-03-16 10:50:00'), 
 									Timestamp('2020-03-16 11:00:00'), Timestamp('2020-03-16 11:10:00'), 
 									Timestamp('2020-03-16 11:20:00'), Timestamp('2020-03-16 11:30:00'), 
 									Timestamp('2020-03-16 11:40:00')],
-		'status': ['too_high', 'too_high', 'too_high', None, 'too_low', 'too_low', 'too_low', 'too_low', None, None, None], 
-		'reading_gap_mins': [None, 10.0, 10.0, None, None, 10.0, 10.0, 10.0, None, None, None]})
+							'status': ['too_high', 'too_high', 'too_high', None, 'too_low', 'too_low', 'too_low', 'too_low', None, None, None], 
+							'reading_gap_mins': [None, 10.0, 10.0, None, None, 10.0, 10.0, 10.0, None, None, None]})
+		tests = [({
+					'date_time':Timestamp('2020-03-15 10:40:00'),
+					'24hr_window_start': Timestamp('2020-03-14 10:40:00')},20),
+				({
+					'date_time': Timestamp('2020-03-16 11:10:00'), 
+					'24hr_window_start': Timestamp('2020-03-15 11:10:00')},30)
+				]
+		
+		for data, expected_duration in tests:
+			with self.subTest(data):
+				result = self.analytical_service.spike_duration_in_24hr_window(pd.Series(data), df)
+				self.assertEqual(result, expected_duration)
 
-		df = self.analytical_service.determine_spike_duration_24hr_mins(sample_df_24hr_spikes, sample_df)
-		self.assertEqual(df['spike_duration_24hr_mins'][0], 30.0)
-
-		with patch.object(AnalyticalService,'spike_duration_in_24hr_window', return_value = 10.0, autospec = True) as mock_spike_duration:
-			df = self.analytical_service.determine_spike_duration_24hr_mins(sample_df_24hr_spikes, sample_df)
-			mock_spike_duration.assert_called_once()
+	def test_determine_spike_duration_24hr_mins(self):
+		with patch.object(AnalyticalService,'spike_duration_in_24hr_window', autospec = True) as mock_spike_duration:
+			self.analytical_service.determine_spike_duration_24hr_mins(pd.DataFrame({}), pd.DataFrame({}))
+			mock_spike_duration.assert_called()
 
 	def test_get_extremes_info(self):
-		sample_df = pd.DataFrame({'date_time': [Timestamp('2020-03-15 10:20:00'), Timestamp('2020-03-15 10:30:00'), 
+		sample_df = pd.DataFrame({
+									'date_time': [Timestamp('2020-03-15 10:20:00'), Timestamp('2020-03-15 10:30:00'), 
 									Timestamp('2020-03-15 10:40:00'), Timestamp('2020-03-16 10:30:00'), 
 									Timestamp('2020-03-16 10:40:00'), Timestamp('2020-03-16 10:50:00'), 
 									Timestamp('2020-03-16 11:00:00'), Timestamp('2020-03-16 11:10:00'), 
@@ -386,10 +397,10 @@ class TestAnalyzeSpikes(unittest.TestCase):
 									'extreme_date_time': [Timestamp('2020-03-15 10:30:00'), Timestamp('2020-03-16 11:10:00')], 
 									'spike_duration_mins': [20, 30]})
 
-		df_total_spike_duration = pd.DataFrame({'cumulat_spike_id': [3],
-												'date_time':[Timestamp('2020-03-16 11:10:00')],
-												'24hr_window_start': [Timestamp('2020-03-15 11:10:00')], 
-												'spike_duration_24hr_mins': [30.0]})
+		df_total_spike_duration = pd.DataFrame({'cumulat_spike_id': [1,3],
+												'date_time':[Timestamp('2020-03-15 10:30:00'),Timestamp('2020-03-16 11:10:00')],
+												'24hr_window_start': [Timestamp('2020-03-14 10:30:00'),Timestamp('2020-03-15 11:10:00')], 
+												'spike_duration_24hr_mins': [20.0,30.0]})
 		df_merged = self.analytical_service.prepare_excursions_dict(df_total_spike_duration, df_excursions)
 		print(df_merged)
 
