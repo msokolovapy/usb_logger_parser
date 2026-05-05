@@ -91,6 +91,7 @@ class AnalyticalService():
     def get_extremes_info(self, df):
         df_extremes = df[df['status'].isin(['too_high', 'too_low'])].groupby('cumulat_spike_id').agg(
                                                                                                     extreme_temp=('celsius', lambda x: get_extreme_temp(x)),
+                                                                                                    spike_date = ('date_time', min),
                                                                                                     extreme_date_time=('date_time', lambda x: get_extreme_date_time(x, df)),
                                                                                                     spike_duration_mins =('date_time', lambda x: get_spike_duration(x))
                                                                                                     )
@@ -101,6 +102,17 @@ class AnalyticalService():
         df_filtered = df_total_spike_duration[['cumulat_spike_id', 'spike_duration_24hr_mins']]
         df_merged = df_excursions.merge(df_filtered, on = 'cumulat_spike_id', how = 'left')
         return df_merged
+
+    def renumber_spikes(self, df):
+        date_filter = df['extreme_date_time'].dt.date
+        df.insert(loc=0, column='spike_number', value=df.groupby(date_filter).cumcount() + 1)
+        df.drop('cumulat_spike_id', axis=1, inplace=True)
+        return df
+
+    def report_df(self,df):
+        df = self.renumber_spikes(df)
+        return df.to_dict('list')
+
 
 
 

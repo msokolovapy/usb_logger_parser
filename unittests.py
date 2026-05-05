@@ -88,6 +88,8 @@ class TestHelperFunctions(unittest.TestCase):
 		self.assertIsNotNone(storage_condit)
 		self.assertEqual(storage_condit.high_alert, 15.0)
 
+	def test_get_average_temp(self):
+		self.fail('finish testing')
 
 	@patch('os.path.basename')
 	@patch(f'{__name__}.validate_')
@@ -149,18 +151,13 @@ class TestAnalyzeSpikes(unittest.TestCase):
 				patch.object(AnalyticalService, 'get_extremes_info') as mock_excursions,\
 				patch.object(AnalyticalService, 'prepare_excursions_dict') as mock_excursions_dict:
 
-			mock_1 = Mock(temp_data = {'dummy_column': 'dummy_value'}, low_alarm = 'low_alarm', high_alarm = 'high_alarm')
-			mock_2 = Mock(temp_data = {'dummy_column': 'dummy_value'}, low_alarm = 'low_alarm', high_alarm = 'high_alarm')
-			storage_units = [mock_1, mock_2]
-			expected_excursions_dict = {mock_1: 'expected_dict_1',
-										mock_2: 'expected_dict_2'}
-
+			storage_units = [Mock(temp_data = {'dummy_column': 'dummy_value'}, low_alarm = 'low_alarm', high_alarm = 'high_alarm')]
 
 			mock_add_status.side_effect = ['df_added_status']
 			mock_cumulat_id.side_effect = ['df_with_cumulat_spike_id']
 			mock_last_spike.side_effect = ['df_last_spike_added']
 			mock_excursions.side_effect = ['df_excursions']
-			mock_excursions_dict.side_effect = ['excursions_dict_1', 'expected_dict_2']
+			mock_excursions_dict.side_effect = ['excursions_dict']
 
 			spike_dict_list = self.analytical_service.analyze_spikes(storage_units)
 
@@ -170,7 +167,7 @@ class TestAnalyzeSpikes(unittest.TestCase):
 			mock_excursions.assert_called_with('df_with_cumulat_spike_id')
 			mock_excursions_dict.assert_called_with('df_last_spike_added', 'df_excursions')
 
-			self.fail('finish testing analyze_spikes')
+			self.assertEqual(spike_dict_list, ['excursions_dict'])
 
 	def test_add_status_column(self):
 		sample_df = pd.DataFrame({'date_time':["2020-03-15 10:20:00",
@@ -394,6 +391,7 @@ class TestAnalyzeSpikes(unittest.TestCase):
 	def test_prepare_excursions_dict(self):
 		df_excursions = pd.DataFrame({'cumulat_spike_id':[1,3],
 									'extreme_temp': [20.0, 1.5], 
+									'spike_date': [Timestamp('2020-03-15'), Timestamp('2020-03-16')],
 									'extreme_date_time': [Timestamp('2020-03-15 10:30:00'), Timestamp('2020-03-16 11:10:00')], 
 									'spike_duration_mins': [20, 30]})
 
@@ -402,9 +400,39 @@ class TestAnalyzeSpikes(unittest.TestCase):
 												'24hr_window_start': [Timestamp('2020-03-14 10:30:00'),Timestamp('2020-03-15 11:10:00')], 
 												'spike_duration_24hr_mins': [20.0,30.0]})
 		df_merged = self.analytical_service.prepare_excursions_dict(df_total_spike_duration, df_excursions)
-		print(df_merged)
+		expected_result = {
+							'cumulat_spike_id': [1, 3], 
+							'extreme_temp': [20.0, 1.5], 
+							'spike_date': [Timestamp('2020-03-15'), Timestamp('2020-03-16')],
+							'extreme_date_time': [Timestamp('2020-03-15 10:30:00'), Timestamp('2020-03-16 11:10:00')], 
+							'spike_duration_mins': [20, 30], 
+							'spike_duration_24hr_mins': [20.0, 30.0]
+							}
+		self.assertEqual(df_merged.to_dict('list'), expected_result)
 
-			
+	def test_renumber_spikes(self):
+		sample_df = pd.DataFrame({
+							'cumulat_spike_id': [1, 3], 
+							'extreme_temp': [20.0, 1.5],
+							'spike_date': [Timestamp('2020-03-15'), Timestamp('2020-03-16')], 
+							'extreme_date_time': [Timestamp('2020-03-15 10:30:00'), Timestamp('2020-03-16 11:10:00')], 
+							'spike_duration_mins': [20, 30], 
+							'spike_duration_24hr_mins': [20.0, 30.0]
+							})
+		df_spikes_renumbered = self.analytical_service.renumber_spikes(sample_df)
+		self.assertIn('spike_number', df_spikes_renumbered.columns)
+		self.assertNotIn('cumulat_spike_id', df_spikes_renumbered.columns)
+		self.assertTrue(df_spikes_renumbered['spike_number'].dtype == int)
+		self.assertEqual(df_spikes_renumbered.columns.get_loc('spike_number'), 0)
+
+	def test_report_df(self):
+		with patch.object(AnalyticalService, 'renumber_spikes') as mock_renumb_spikes:
+			mock_renumb_spikes.return_value.to_dict	= 'df_renumbered_spikes_converted_to_dict'	
+
+			spike_dict = self.analytical_service.report_df('dummy_df')
+
+			mock_renumb_spikes.assert_called_with('dummy_df')
+			self.assertEqual(spike_dict,'df_renumbered_spikes_converted_to_dict' )
 
 
 
