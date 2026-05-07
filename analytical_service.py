@@ -15,7 +15,10 @@ class AnalyticalService():
             df = self.add_cumulat_spike_id(df)
             df_total_spike_duration = self.prepare_df_last_spike_of_day(df)
             df_excursions = self.get_extremes_info(df)
-            spike_dict = self.prepare_excursions_dict(df_total_spike_duration, df_excursions)
+            df = self.prepare_excursions_df(df_total_spike_duration, df_excursions)
+            df = self.renumber_spikes(df)
+            df = self.check_against_limits(df, unit.spike_duration, unit.total_spikes_duration)
+            spike_dict = self.find_mkt(df,unit.temp_data)
             spike_dict_list.append(spike_dict)
         return spike_dict_list
 
@@ -98,21 +101,48 @@ class AnalyticalService():
         return df_extremes
 
     
-    def prepare_excursions_dict(self,df_total_spike_duration, df_excursions):
+    def prepare_excursions_df(self,df_total_spike_duration, df_excursions):
         df_filtered = df_total_spike_duration[['cumulat_spike_id', 'spike_duration_24hr_mins']]
         df_merged = df_excursions.merge(df_filtered, on = 'cumulat_spike_id', how = 'left')
         return df_merged
 
     def renumber_spikes(self, df):
-        date_filter = df['extreme_date_time'].dt.date
+        date_filter = df['spike_date']
         df.insert(loc=0, column='spike_number', value=df.groupby(date_filter).cumcount() + 1)
         df.drop('cumulat_spike_id', axis=1, inplace=True)
         return df
 
-    def report_df(self,df):
-        df = self.renumber_spikes(df)
-        return df.to_dict('list')
+    def check_against_limits(self,df, single_spike_duration, total_spikes_duration):
+        mask = (df['spike_duration_mins'] > single_spike_duration) | (df['spike_duration_24hr_mins'] > total_spikes_duration)
+        df.loc[mask,'spike_status'] = 'Fail'
+        df.loc[df['spike_status'] != 'Fail', 'spike_status'] = 'Pass'
+        return df
+    
+    
+    def find_mkt(self,df_excursions, original_df):
+        df_excursions['mkt'] = df_excursions.apply(calculate_mkt_24hr_window, df = original_df, axis = 1)
+        return df_excursions.to_dict('records')
 
+    def calculate_mkt_24hr_window(row, df):
+        window_start = row['extreme_date_time'] - timedelta(hours=12)
+        window_end = row['extreme_date_time'] + timedelta(hours=12)
+        
+        mask = (row['spike_status'] == 'Fail')
+                &
+                ((df['date_time'] <= window_end) & (df['date_time'] >= window_start))
+                
+        filtered_df = df.loc(mask).copy()
+        return apply_arrhenius(filtered_df)
+
+    def apply_arrhenius(filtered_df):
+        delta_H = 83.144
+        R_constant = 0.0083144
+
+        filtered_df['mkt_temp_variable'] = np.exp(-delta_H/(R_constant*(filtered_df['celsius'] + 273.15)))
+        sum_mkt_temp_variables = filtered_df['mkt_temp_variable'].sum()
+        mkt = (delta_H/R_constant)/(-math.log(sum_mkt_temp_variables/len(filtered_df))) - 273.15
+        mkt = round(mkt,1)
+        return mkt
 
 
 

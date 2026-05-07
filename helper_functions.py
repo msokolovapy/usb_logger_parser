@@ -14,8 +14,8 @@ def read(file):
 	file_basename = os.path.basename(file)
 	return df_temp_data,logger_id, serial_numb, file_basename
 
-def get_average_temp():
-	pass
+def get_average_temp(df):
+	return df['celsius'].mean()
 
 def parse_(df):
 		df = df.copy()

@@ -89,7 +89,9 @@ class TestHelperFunctions(unittest.TestCase):
 		self.assertEqual(storage_condit.high_alert, 15.0)
 
 	def test_get_average_temp(self):
-		self.fail('finish testing')
+		df = pd.DataFrame({'celsius': [-25.0, -26.0, -24.0, -23.0]})
+		average_temp = get_average_temp(df)
+		self.assertEqual(average_temp, -24.5)
 
 	@patch('os.path.basename')
 	@patch(f'{__name__}.validate_')
@@ -148,26 +150,43 @@ class TestAnalyzeSpikes(unittest.TestCase):
 		with patch.object(AnalyticalService,'add_status_column') as mock_add_status,\
 				patch.object(AnalyticalService, 'add_cumulat_spike_id') as mock_cumulat_id,\
 				patch.object(AnalyticalService, 'prepare_df_last_spike_of_day') as mock_last_spike,\
-				patch.object(AnalyticalService, 'get_extremes_info') as mock_excursions,\
-				patch.object(AnalyticalService, 'prepare_excursions_dict') as mock_excursions_dict:
+				patch.object(AnalyticalService, 'get_extremes_info') as mock_extremes,\
+				patch.object(AnalyticalService, 'prepare_excursions_df') as mock_excursions_df,\
+				patch.object(AnalyticalService, 'renumber_spikes') as mock_renumber_spikes,\
+				patch.object(AnalyticalService, 'check_against_limits') as mock_check_limits,\
+				patch.object(AnalyticalService, 'find_mkt') as mock_mkt:
 
-			storage_units = [Mock(temp_data = {'dummy_column': 'dummy_value'}, low_alarm = 'low_alarm', high_alarm = 'high_alarm')]
+			storage_units = [Mock(
+									temp_data = {'dummy_column': 'dummy_value'}, 
+									low_alarm = 'low_alarm', 
+									high_alarm = 'high_alarm',
+									spike_duration = 'spike_duration',
+									total_spikes_duration = 'total_spikes_duration'
+									)
+							]
 
 			mock_add_status.side_effect = ['df_added_status']
 			mock_cumulat_id.side_effect = ['df_with_cumulat_spike_id']
 			mock_last_spike.side_effect = ['df_last_spike_added']
-			mock_excursions.side_effect = ['df_excursions']
-			mock_excursions_dict.side_effect = ['excursions_dict']
+			mock_extremes.side_effect = ['df_extremes']
+			mock_excursions_df.side_effect = ['df_excursions']
+			mock_renumber_spikes.return_value = 'df_renumbered_spikes'
+			mock_check_limits.return_value = 'df_checked_against_limits'
+			mock_mkt.return_value = 'df_mkt_calculated'
 
-			spike_dict_list = self.analytical_service.analyze_spikes(storage_units)
+			result = self.analytical_service.analyze_spikes(storage_units)
 
 			mock_add_status.assert_called_with({'dummy_column': 'dummy_value'}, 'low_alarm', 'high_alarm')
 			mock_cumulat_id.assert_called_with('df_added_status')
 			mock_last_spike.assert_called_with('df_with_cumulat_spike_id')
-			mock_excursions.assert_called_with('df_with_cumulat_spike_id')
-			mock_excursions_dict.assert_called_with('df_last_spike_added', 'df_excursions')
+			mock_extremes.assert_called_with('df_with_cumulat_spike_id')
+			mock_excursions_df.assert_called_with('df_last_spike_added', 'df_extremes')
+			mock_renumber_spikes.assert_called_with('df_excursions')
+			mock_check_limits.assert_called_with('df_renumbered_spikes', 'spike_duration', 'total_spikes_duration')
+			mock_mkt.assert_called_with('df_checked_against_limits')
 
-			self.assertEqual(spike_dict_list, ['excursions_dict'])
+			self.assertEqual(result, ['df_mkt_calculated'])
+			self.fail('finish testing!')
 
 	def test_add_status_column(self):
 		sample_df = pd.DataFrame({'date_time':["2020-03-15 10:20:00",
@@ -388,7 +407,7 @@ class TestAnalyzeSpikes(unittest.TestCase):
 		self.assertEqual(df_excursions['spike_duration_mins'].to_list(), expected_spike_duration_mins)
 		self.assertEqual(df_excursions['extreme_temp'].to_list(), expected_extreme_temps)
 
-	def test_prepare_excursions_dict(self):
+	def test_prepare_excursions_df(self):
 		df_excursions = pd.DataFrame({'cumulat_spike_id':[1,3],
 									'extreme_temp': [20.0, 1.5], 
 									'spike_date': [Timestamp('2020-03-15'), Timestamp('2020-03-16')],
@@ -399,7 +418,7 @@ class TestAnalyzeSpikes(unittest.TestCase):
 												'date_time':[Timestamp('2020-03-15 10:30:00'),Timestamp('2020-03-16 11:10:00')],
 												'24hr_window_start': [Timestamp('2020-03-14 10:30:00'),Timestamp('2020-03-15 11:10:00')], 
 												'spike_duration_24hr_mins': [20.0,30.0]})
-		df_merged = self.analytical_service.prepare_excursions_dict(df_total_spike_duration, df_excursions)
+		df_merged = self.analytical_service.prepare_excursions_df(df_total_spike_duration, df_excursions)
 		expected_result = {
 							'cumulat_spike_id': [1, 3], 
 							'extreme_temp': [20.0, 1.5], 
@@ -413,11 +432,7 @@ class TestAnalyzeSpikes(unittest.TestCase):
 	def test_renumber_spikes(self):
 		sample_df = pd.DataFrame({
 							'cumulat_spike_id': [1, 3], 
-							'extreme_temp': [20.0, 1.5],
-							'spike_date': [Timestamp('2020-03-15'), Timestamp('2020-03-16')], 
-							'extreme_date_time': [Timestamp('2020-03-15 10:30:00'), Timestamp('2020-03-16 11:10:00')], 
-							'spike_duration_mins': [20, 30], 
-							'spike_duration_24hr_mins': [20.0, 30.0]
+							'spike_date': [Timestamp('2020-03-15'), Timestamp('2020-03-16')]
 							})
 		df_spikes_renumbered = self.analytical_service.renumber_spikes(sample_df)
 		self.assertIn('spike_number', df_spikes_renumbered.columns)
@@ -425,14 +440,25 @@ class TestAnalyzeSpikes(unittest.TestCase):
 		self.assertTrue(df_spikes_renumbered['spike_number'].dtype == int)
 		self.assertEqual(df_spikes_renumbered.columns.get_loc('spike_number'), 0)
 
-	def test_report_df(self):
-		with patch.object(AnalyticalService, 'renumber_spikes') as mock_renumb_spikes:
-			mock_renumb_spikes.return_value.to_dict	= 'df_renumbered_spikes_converted_to_dict'	
+	def test_check_against_limits(self):
+		df = pd.DataFrame({ 
+							'spike_duration_mins': [20, 30], 
+							'spike_duration_24hr_mins': [20.0, 30.0]
+							})
+		df_checked_against_limits = self.analytical_service.check_against_limits(df, self.unit.spike_duration, self.unit.total_spikes_duration)
+		
+		self.assertIn('spike_status', df_checked_against_limits.columns)
+		self.assertTrue((df_checked_against_limits['spike_status'] == 'Pass').all())
 
-			spike_dict = self.analytical_service.report_df('dummy_df')
 
-			mock_renumb_spikes.assert_called_with('dummy_df')
-			self.assertEqual(spike_dict,'df_renumbered_spikes_converted_to_dict' )
+	def test_find_mkt(self):
+		self.fail('finish testing')
+
+	def test_calculate_mkt_24hr_window(self):
+		self.fail('finish testing')
+		
+	def test_apply_arrhenius(self):
+		self.fail('finish testing')
 
 
 
