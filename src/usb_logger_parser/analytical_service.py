@@ -5,7 +5,9 @@ from src.usb_logger_parser.helper_functions import (
     get_spike_duration,
 )
 import pandas as pd
-
+import numpy as np
+import math
+from datetime import timedelta
 
 class AnalyticalService:
     def __init__(self):
@@ -146,11 +148,11 @@ class AnalyticalService:
 
     def find_mkt(self, df_excursions, original_df):
         df_excursions["mkt"] = df_excursions.apply(
-            calculate_mkt_24hr_window, df=original_df, axis=1
+            self.calculate_mkt_24hr_window, df=original_df, axis=1
         )
         return df_excursions.to_dict("records")
 
-    def calculate_mkt_24hr_window(row, df):
+    def calculate_mkt_24hr_window(self,row, df):
         window_start = row["extreme_date_time"] - timedelta(hours=12)
         window_end = row["extreme_date_time"] + timedelta(hours=12)
 
@@ -158,12 +160,14 @@ class AnalyticalService:
             (df["date_time"] <= window_end) & (df["date_time"] >= window_start)
         )
 
-        filtered_df = df.loc(mask).copy()
-        return apply_arrhenius(filtered_df)
+        filtered_df = df.loc[mask].copy()
+        return self.apply_arrhenius(filtered_df)
 
-    def apply_arrhenius(filtered_df):
+    def apply_arrhenius(self,filtered_df):
         delta_H = 83.144
         R_constant = 0.0083144
+
+        print(f'printing filtered df here: {filtered_df}')
 
         filtered_df["mkt_temp_variable"] = np.exp(
             -delta_H / (R_constant * (filtered_df["celsius"] + 273.15))

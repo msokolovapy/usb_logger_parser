@@ -37,13 +37,9 @@ xlsx_data_report = reporting_service.report_data_(storage_units)
 
 ## ⬇️ Installation
 
-Requires Python 3.x and `pandas`.
-
 ```bash
 pip install -e .
 ```
-
-Dependencies are declared in `usb_logger_parser.toml`.
 
 ## ⚙️ Configuration
 

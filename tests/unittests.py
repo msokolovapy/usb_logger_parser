@@ -285,7 +285,7 @@ class TestAnalyzeSpikes(unittest.TestCase):
             mock_check_limits.assert_called_with(
                 "df_renumbered_spikes", "spike_duration", "total_spikes_duration"
             )
-            mock_mkt.assert_called_with("df_checked_against_limits")
+            mock_mkt.assert_called_with('df_checked_against_limits', {'dummy_column': 'dummy_value'})
 
             self.assertEqual(result, ["df_mkt_calculated"])
             self.fail("finish testing!")
@@ -770,13 +770,55 @@ class TestAnalyzeSpikes(unittest.TestCase):
         self.assertTrue((df_checked_against_limits["spike_status"] == "Pass").all())
 
     def test_find_mkt(self):
-        self.fail("finish testing")
+        with patch.object(
+            AnalyticalService, "calculate_mkt_24hr_window", autospec=True
+        ) as mock_mkt:
+            self.analytical_service.find_mkt(
+                pd.DataFrame({}), pd.DataFrame({})
+            )
+            mock_mkt.assert_called()
 
     def test_calculate_mkt_24hr_window(self):
-        self.fail("finish testing")
+        sample_row = pd.Series({'extreme_date_time': Timestamp("2020-03-16 11:10:00"), 'spike_status': 'Fail'})
+        sample_df = pd.DataFrame({"date_time": [
+            Timestamp("2020-03-15 10:20:00"),
+            Timestamp("2020-03-15 10:30:00"),
+            Timestamp("2020-03-15 10:40:00"),
+            Timestamp("2020-03-16 10:30:00"),
+            Timestamp("2020-03-16 10:40:00"),
+            Timestamp("2020-03-16 10:50:00"),
+            Timestamp("2020-03-16 11:00:00"),
+            Timestamp("2020-03-16 11:10:00"),
+            Timestamp("2020-03-16 11:20:00"),
+            Timestamp("2020-03-16 11:30:00"),
+            Timestamp("2020-03-16 11:40:00"),
+        ],
+                "celsius": [16.0, 20.0, 16.0, 5.0, 0.0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.5],
+            })
+        result = self.analytical_service.calculate_mkt_24hr_window(sample_row, sample_df)
+        self.assertEqual(result, 9.6)
 
     def test_apply_arrhenius(self):
-        self.fail("finish testing")
+            sample_df = pd.DataFrame(
+    {
+        "date_time": [
+            Timestamp("2020-03-15 10:20:00"),
+            Timestamp("2020-03-15 10:30:00"),
+            Timestamp("2020-03-15 10:40:00"),
+            Timestamp("2020-03-16 10:30:00"),
+            Timestamp("2020-03-16 10:40:00"),
+            Timestamp("2020-03-16 10:50:00"),
+            Timestamp("2020-03-16 11:00:00"),
+            Timestamp("2020-03-16 11:10:00"),
+            Timestamp("2020-03-16 11:20:00"),
+            Timestamp("2020-03-16 11:30:00"),
+            Timestamp("2020-03-16 11:40:00"),
+        ],
+        "celsius": [16.0, 20.0, 16.0, 5.0, 0.0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.5]})
+            expected_result = 9.6
+            result = self.analytical_service.apply_arrhenius(sample_df)
+            self.assertEqual(result, expected_result)
+
 
 
 if __name__ == "__main__":
