@@ -1,4 +1,0 @@
-
-2026-04-21 02:26:18,743 - ACPL234_ACPL01_09Apr2026.validate_ - WARNING - Some columns are missing: Celsius(°C), Time
-2026-04-21 03:06:09,285 - ACPL234_ACPL01_09Apr2026.validate_ - WARNING - Some columns are missing: Time, Celsius(°C)
-2026-04-21 03:13:40,517 - ACPL234_ACPL01_09Apr2026.validate_ - WARNING - Some columns are missing: Time, Celsius(°C)
