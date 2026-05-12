@@ -8,23 +8,31 @@
 - Detects excursions against configurable upper/lower temperature limits
 - Calculates individual and total excursion duration (using rolling 24-hour window)
 - Calculates Mean Kinetic Temperature (MKT) for failing excursions (using 12-hr before and after window)
+- Saves excursions dictionary as .xlsx file
+- Overlays and graphs temperature data. Saves as .xlsx file.
 - Vectorised `pandas` operations for performance
 - Class-based structure for maintainability
 
 ## ℹ️ Overview
 
-USB Data Logger Parser is a Python pipeline for processing cold chain temperature data. It reads CSV files from USB loggers, identifies periods where temperature falls outside defined limits, and characterises each excursion by duration, extreme temperature and extreme date/time. If an excursion is outside a specified limit, MKT is calculated.
+USB Data Logger Parser is a Python pipeline for processing cold chain temperature data. It reads CSV files from USB loggers, identifies periods where temperature falls outside defined limits, and characterises each excursion by duration, extreme temperature and extreme date/time. If an excursion is outside a specified limit, MKT is calculated. Temperature data and excursions dictionary may be reported as .xlsx files.
 
 The tool is designed for batch processing — useful wherever you need a reliable, repeatable way to review temperature records and flag potential compliance issues.
 
 ## 🚀 Usage
 
 ```python
-from usb_logger_parser import LoggerParser
+from usb_logger_parser.analytical_service import AnalyticalService
+from usb_logger_parser.reporting_service import ReportingService
+from usb_logger_parser.storage_units import StorageCondition
 
-parser = LoggerParser("path/to/logger_file.csv")
-results = parser.run()
-print(results.summary())
+file_list = []
+reporting_service = ReportingService()
+analytical_service = AnalyticalService()
+storage_units = [StorageCondition.create_from_(file) for file in files]
+spike_dicts = analytical_service.analyze_spikes(storage_units)
+xlsx_spike_report = reporting_service.report_spike_dict_(spike_dicts)
+xlsx_data_report = reporting_service.report_data_(storage_units)
 ```
 
 ## ⬇️ Installation
@@ -52,9 +60,9 @@ usb_logger_parser/
 ├── pyproject.toml
 ├── usb_logger_parser/
 │   ├── __init__.py
-│   ├── app.py        # Core parsing and excursion detection logic
-│   └── storage_conditions.py
-│   └── storage_conditions.py
+│   ├── app.py     
+│   └── helper_functions.py
+│   └── storage_units.py
 │   └── analytical_service.py
 │   └── reporting_service.py
 │   

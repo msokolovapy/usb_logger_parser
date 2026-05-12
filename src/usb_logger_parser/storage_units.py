@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from helper_functions import read, get_average_temp, get_user_confirmation
+from src.usb_logger_parser.helper_functions import read, get_average_temp, get_user_confirmation
 
 class StorageCondition():
 	@classmethod

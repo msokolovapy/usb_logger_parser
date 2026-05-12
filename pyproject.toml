@@ -12,9 +12,18 @@ description = "Parse cold chain USB temperature logger CSV files and detect excu
 readme = "README.md"
 requires-python = ">=3.9"
 dependencies = [
-  "pandas",
+    "pandas==3.0.2",
+    "xlsxwriter==3.2.9",
 ]
 classifiers = [
   "Programming Language :: Python :: 3",
   "Operating System :: OS Independent",
 ]
+
+[project.optional-dependencies]
+dev = [
+    "black==26.3.1",
+]
+
+[tool.black]
+target-version = ["py312"]
