@@ -46,26 +46,26 @@ SAMPLE_DF = pd.DataFrame(
             20,
         ],
         "Time": [
-            "2020-03-16 10:30:00",
-            "2020-03-16 10:40:00",
-            "2020-03-16 10:50:00",
-            "2020-03-16 11:00:00",
-            "2020-03-16 11:10:00",
-            "2020-03-16 11:20:00",
-            "2020-03-16 11:30:00",
-            "2020-03-16 11:40:00",
-            "2020-03-16 11:50:00",
-            "2020-03-16 12:00:00",
-            "2020-03-16 12:10:00",
-            "2020-03-16 12:20:00",
-            "2020-03-16 12:30:00",
-            "2020-03-16 12:40:00",
-            "2020-03-16 12:50:00",
-            "2020-03-16 13:00:00",
-            "2020-03-16 13:10:00",
-            "2020-03-16 13:20:00",
-            "2020-03-16 13:30:00",
-            "2020-03-16 13:40:00",
+            Timestamp("2020-03-16 10:30:00"),
+            Timestamp("2020-03-16 10:40:00"),
+            Timestamp("2020-03-16 10:50:00"),
+            Timestamp("2020-03-16 11:00:00"),
+            Timestamp("2020-03-16 11:10:00"),
+            Timestamp("2020-03-16 11:20:00"),
+            Timestamp("2020-03-16 11:30:00"),
+            Timestamp("2020-03-16 11:40:00"),
+            Timestamp("2020-03-16 11:50:00"),
+            Timestamp("2020-03-16 12:00:00"),
+            Timestamp("2020-03-16 12:10:00"),
+            Timestamp("2020-03-16 12:20:00"),
+            Timestamp("2020-03-16 12:30:00"),
+            Timestamp("2020-03-16 12:40:00"),
+            Timestamp("2020-03-16 12:50:00"),
+            Timestamp("2020-03-16 13:00:00"),
+            Timestamp("2020-03-16 13:10:00"),
+            Timestamp("2020-03-16 13:20:00"),
+            Timestamp("2020-03-16 13:30:00"),
+            Timestamp("2020-03-16 13:40:00"),
         ],
         "Celsius(°C)": [
             0.0,
@@ -78,10 +78,10 @@ SAMPLE_DF = pd.DataFrame(
             4.5,
             5.0,
             6.0,
-            7.0,
+            9.0,
             10.0,
             9.0,
-            8.0,
+            9.5,
             8.5,
             7.0,
             7.3,
@@ -251,18 +251,8 @@ class TestAnalyzeSpikes(unittest.TestCase):
                 AnalyticalService, "check_against_limits"
             ) as mock_check_limits,
             patch.object(AnalyticalService, "find_mkt") as mock_mkt,
+            patch.object(AnalyticalService, "annotate_spike_dict_with_metadata") as mock_annotate_dict,
         ):
-
-            storage_units = [
-                Mock(
-                    temp_data={"dummy_column": "dummy_value"},
-                    low_alarm="low_alarm",
-                    high_alarm="high_alarm",
-                    spike_duration="spike_duration",
-                    total_spikes_duration="total_spikes_duration",
-                )
-            ]
-
             mock_add_status.side_effect = ["df_added_status"]
             mock_cumulat_id.side_effect = ["df_with_cumulat_spike_id"]
             mock_last_spike.side_effect = ["df_last_spike_added"]
@@ -270,25 +260,33 @@ class TestAnalyzeSpikes(unittest.TestCase):
             mock_excursions_df.side_effect = ["df_excursions"]
             mock_renumber_spikes.return_value = "df_renumbered_spikes"
             mock_check_limits.return_value = "df_checked_against_limits"
-            mock_mkt.return_value = "df_mkt_calculated"
+            mock_mkt.return_value = "spike_dict_mkt_calculated"
+            mock_annotate_dict.return_value = 'spike_dict_annotated'
 
-            result = self.analytical_service.analyze_spikes(storage_units)
+            result = self.analytical_service.analyze_spikes([self.unit])
 
-            mock_add_status.assert_called_with(
-                {"dummy_column": "dummy_value"}, "low_alarm", "high_alarm"
-            )
+            pd.testing.assert_frame_equal(mock_add_status.call_args[0][0], self.unit.temp_data)
+            self.assertEqual(mock_add_status.call_args[0][1], 2.0)
+            self.assertEqual(mock_add_status.call_args[0][2], 8.0)
+
+
             mock_cumulat_id.assert_called_with("df_added_status")
             mock_last_spike.assert_called_with("df_with_cumulat_spike_id")
             mock_extremes.assert_called_with("df_with_cumulat_spike_id")
             mock_excursions_df.assert_called_with("df_last_spike_added", "df_extremes")
             mock_renumber_spikes.assert_called_with("df_excursions")
             mock_check_limits.assert_called_with(
-                "df_renumbered_spikes", "spike_duration", "total_spikes_duration"
-            )
-            mock_mkt.assert_called_with('df_checked_against_limits', {'dummy_column': 'dummy_value'})
 
-            self.assertEqual(result, ["df_mkt_calculated"])
-            self.fail("finish testing!")
+                "df_renumbered_spikes", self.unit.spike_duration, self.unit.total_spikes_duration
+            )
+            mock_mkt.assert_called_with(
+                "df_checked_against_limits", self.unit.temp_data
+            )
+            mock_annotate_dict.assert_called_with('spike_dict_mkt_calculated', 'ACP169 BU_FZ156', '052297777', 'dummy_txt')
+
+            self.assertEqual(result, ["spike_dict_annotated"])
+        
+        spike_dict = self.analytical_service.analyze_spikes([self.unit])
 
     def test_add_status_column(self):
         sample_df = pd.DataFrame(
@@ -773,52 +771,73 @@ class TestAnalyzeSpikes(unittest.TestCase):
         with patch.object(
             AnalyticalService, "calculate_mkt_24hr_window", autospec=True
         ) as mock_mkt:
-            self.analytical_service.find_mkt(
-                pd.DataFrame({}), pd.DataFrame({})
-            )
+            self.analytical_service.find_mkt(pd.DataFrame({}), pd.DataFrame({}))
             mock_mkt.assert_called()
 
     def test_calculate_mkt_24hr_window(self):
-        sample_row = pd.Series({'extreme_date_time': Timestamp("2020-03-16 11:10:00"), 'spike_status': 'Fail'})
-        sample_df = pd.DataFrame({"date_time": [
-            Timestamp("2020-03-15 10:20:00"),
-            Timestamp("2020-03-15 10:30:00"),
-            Timestamp("2020-03-15 10:40:00"),
-            Timestamp("2020-03-16 10:30:00"),
-            Timestamp("2020-03-16 10:40:00"),
-            Timestamp("2020-03-16 10:50:00"),
-            Timestamp("2020-03-16 11:00:00"),
-            Timestamp("2020-03-16 11:10:00"),
-            Timestamp("2020-03-16 11:20:00"),
-            Timestamp("2020-03-16 11:30:00"),
-            Timestamp("2020-03-16 11:40:00"),
-        ],
+        sample_row = pd.Series(
+            {
+                "extreme_date_time": Timestamp("2020-03-16 11:10:00"),
+                "spike_status": "Fail",
+            }
+        )
+        sample_df = pd.DataFrame(
+            {
+                "date_time": [
+                    Timestamp("2020-03-15 10:20:00"),
+                    Timestamp("2020-03-15 10:30:00"),
+                    Timestamp("2020-03-15 10:40:00"),
+                    Timestamp("2020-03-16 10:30:00"),
+                    Timestamp("2020-03-16 10:40:00"),
+                    Timestamp("2020-03-16 10:50:00"),
+                    Timestamp("2020-03-16 11:00:00"),
+                    Timestamp("2020-03-16 11:10:00"),
+                    Timestamp("2020-03-16 11:20:00"),
+                    Timestamp("2020-03-16 11:30:00"),
+                    Timestamp("2020-03-16 11:40:00"),
+                ],
                 "celsius": [16.0, 20.0, 16.0, 5.0, 0.0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.5],
-            })
-        result = self.analytical_service.calculate_mkt_24hr_window(sample_row, sample_df)
-        self.assertEqual(result, 9.6)
+            }
+        )
+        result = self.analytical_service.calculate_mkt_24hr_window(
+            sample_row, sample_df
+        )
+        self.assertEqual(result, 2.2)
 
     def test_apply_arrhenius(self):
-            sample_df = pd.DataFrame(
-    {
-        "date_time": [
-            Timestamp("2020-03-15 10:20:00"),
-            Timestamp("2020-03-15 10:30:00"),
-            Timestamp("2020-03-15 10:40:00"),
-            Timestamp("2020-03-16 10:30:00"),
-            Timestamp("2020-03-16 10:40:00"),
-            Timestamp("2020-03-16 10:50:00"),
-            Timestamp("2020-03-16 11:00:00"),
-            Timestamp("2020-03-16 11:10:00"),
-            Timestamp("2020-03-16 11:20:00"),
-            Timestamp("2020-03-16 11:30:00"),
-            Timestamp("2020-03-16 11:40:00"),
-        ],
-        "celsius": [16.0, 20.0, 16.0, 5.0, 0.0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.5]})
-            expected_result = 9.6
-            result = self.analytical_service.apply_arrhenius(sample_df)
-            self.assertEqual(result, expected_result)
+        sample_df = pd.DataFrame(
+            {
+                "date_time": [
+                    Timestamp("2020-03-15 10:20:00"),
+                    Timestamp("2020-03-15 10:30:00"),
+                    Timestamp("2020-03-15 10:40:00"),
+                    Timestamp("2020-03-16 10:30:00"),
+                    Timestamp("2020-03-16 10:40:00"),
+                    Timestamp("2020-03-16 10:50:00"),
+                    Timestamp("2020-03-16 11:00:00"),
+                    Timestamp("2020-03-16 11:10:00"),
+                    Timestamp("2020-03-16 11:20:00"),
+                    Timestamp("2020-03-16 11:30:00"),
+                    Timestamp("2020-03-16 11:40:00"),
+                ],
+                "celsius": [16.0, 20.0, 16.0, 5.0, 0.0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.5],
+            }
+        )
+        expected_result = 9.6
+        result = self.analytical_service.apply_arrhenius(sample_df)
+        self.assertEqual(result, expected_result)
 
+    def test_annotate_spike_dict_with_metadata(self):
+        spike_dict = {}
+        result = self.analytical_service.annotate_spike_dict_with_metadata(
+            spike_dict,
+            self.unit.logger.id,
+            self.unit.logger.serial_numb,
+            self.unit.metadata,
+        )
+        self.assertEqual(result["logger_id"], "ACP169 BU_FZ156")
+        self.assertEqual(result["logger_serial_number"], "052297777")
+        self.assertEqual(result["file_name"], "dummy_txt")
 
 
 if __name__ == "__main__":

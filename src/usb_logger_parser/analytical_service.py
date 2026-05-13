@@ -28,6 +28,7 @@ class AnalyticalService:
                 df, unit.spike_duration, unit.total_spikes_duration
             )
             spike_dict = self.find_mkt(df, unit.temp_data)
+            spike_dict = self.annotate_spike_dict_with_metadata(spike_dict, unit.logger.id, unit.logger.serial_numb,unit.metadata)
             spike_dict_list.append(spike_dict)
         return spike_dict_list
 
@@ -167,14 +168,22 @@ class AnalyticalService:
         delta_H = 83.144
         R_constant = 0.0083144
 
-        print(f'printing filtered df here: {filtered_df}')
-
         filtered_df["mkt_temp_variable"] = np.exp(
             -delta_H / (R_constant * (filtered_df["celsius"] + 273.15))
         )
         sum_mkt_temp_variables = filtered_df["mkt_temp_variable"].sum()
+        if len(filtered_df) == 0:
+            return None
         mkt = (delta_H / R_constant) / (
             -math.log(sum_mkt_temp_variables / len(filtered_df))
         ) - 273.15
         mkt = round(mkt, 1)
         return mkt
+
+    def annotate_spike_dict_with_metadata(self, spike_dict, logger_id, logger_serial_number, file_name):
+        spike_dict_annotated = {}
+        spike_dict_annotated['spikes'] = spike_dict
+        spike_dict_annotated['logger_id'] = logger_id
+        spike_dict_annotated['logger_serial_number'] = logger_serial_number
+        spike_dict_annotated['file_name'] = file_name
+        return spike_dict_annotated
