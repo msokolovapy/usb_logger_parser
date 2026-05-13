@@ -287,6 +287,7 @@ class TestAnalyzeSpikes(unittest.TestCase):
             self.assertEqual(result, ["spike_dict_annotated"])
         
         spike_dict = self.analytical_service.analyze_spikes([self.unit])
+        self.fail('finish testing')
 
     def test_add_status_column(self):
         sample_df = pd.DataFrame(

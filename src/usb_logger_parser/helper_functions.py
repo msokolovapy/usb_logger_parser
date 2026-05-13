@@ -90,7 +90,8 @@ def get_spike_duration(pandas_series_date_time):
 def get_extreme_date_time(pandas_series_date_time, df):
     filtered = df.loc[pandas_series_date_time.index, "celsius"]
     mask = filtered.abs().idxmax()
-    return pandas_series_date_time.loc[mask]
+    extreme_date_times = pandas_series_date_time.loc[mask]
+    return extreme_date_times
 
 
 def get_extreme_temp(pandas_series_celsius):

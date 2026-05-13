@@ -9,6 +9,7 @@ import numpy as np
 import math
 from datetime import timedelta
 
+
 class AnalyticalService:
     def __init__(self):
         pass
@@ -28,7 +29,9 @@ class AnalyticalService:
                 df, unit.spike_duration, unit.total_spikes_duration
             )
             spike_dict = self.find_mkt(df, unit.temp_data)
-            spike_dict = self.annotate_spike_dict_with_metadata(spike_dict, unit.logger.id, unit.logger.serial_numb,unit.metadata)
+            spike_dict = self.annotate_spike_dict_with_metadata(
+                spike_dict, unit.logger.id, unit.logger.serial_numb, unit.metadata
+            )
             spike_dict_list.append(spike_dict)
         return spike_dict_list
 
@@ -44,7 +47,7 @@ class AnalyticalService:
         return df
 
     def add_gap_mins(self, df):
-        """groups spike info and finds delta datetime between readings within the group. 
+        """groups spike info and finds delta datetime between readings within the group.
         Will be used to calculate total_spike_duration"""
         df["reading_gap_mins"] = (
             df.groupby("cumulat_spike_id")["date_time"].diff().dt.total_seconds() / 60
@@ -117,7 +120,7 @@ class AnalyticalService:
             .groupby("cumulat_spike_id")
             .agg(
                 extreme_temp=("celsius", lambda x: get_extreme_temp(x)),
-                spike_date=("date_time", min),
+                spike_date=("date_time", lambda x: x.dt.date.min()),
                 extreme_date_time=("date_time", lambda x: get_extreme_date_time(x, df)),
                 spike_duration_mins=("date_time", lambda x: get_spike_duration(x)),
             )
@@ -134,7 +137,9 @@ class AnalyticalService:
     def renumber_spikes(self, df):
         date_filter = df["spike_date"]
         df.insert(
-            loc=0, column="spike_number", value=df.groupby(date_filter).cumcount() + 1
+            loc=0,
+            column="spike_number",
+            value=df.groupby(date_filter).cumcount() + 1,
         )
         df.drop("cumulat_spike_id", axis=1, inplace=True)
         return df
@@ -151,9 +156,11 @@ class AnalyticalService:
         df_excursions["mkt"] = df_excursions.apply(
             self.calculate_mkt_24hr_window, df=original_df, axis=1
         )
+        #converti Timedelta to datetime object and pack everything into a list of dictionaries
+        df_excursions['extreme_date_time'] = pd.to_datetime(df_excursions['extreme_date_time']).dt.to_pydatetime()
         return df_excursions.to_dict("records")
 
-    def calculate_mkt_24hr_window(self,row, df):
+    def calculate_mkt_24hr_window(self, row, df):
         window_start = row["extreme_date_time"] - timedelta(hours=12)
         window_end = row["extreme_date_time"] + timedelta(hours=12)
 
@@ -164,7 +171,7 @@ class AnalyticalService:
         filtered_df = df.loc[mask].copy()
         return self.apply_arrhenius(filtered_df)
 
-    def apply_arrhenius(self,filtered_df):
+    def apply_arrhenius(self, filtered_df):
         delta_H = 83.144
         R_constant = 0.0083144
 
@@ -180,10 +187,12 @@ class AnalyticalService:
         mkt = round(mkt, 1)
         return mkt
 
-    def annotate_spike_dict_with_metadata(self, spike_dict, logger_id, logger_serial_number, file_name):
+    def annotate_spike_dict_with_metadata(
+        self, spike_dict_list, logger_id, logger_serial_number, file_name
+    ):
         spike_dict_annotated = {}
-        spike_dict_annotated['spikes'] = spike_dict
-        spike_dict_annotated['logger_id'] = logger_id
-        spike_dict_annotated['logger_serial_number'] = logger_serial_number
-        spike_dict_annotated['file_name'] = file_name
+        spike_dict_annotated["spikes"] = spike_dict_list
+        spike_dict_annotated["logger_id"] = logger_id
+        spike_dict_annotated["logger_serial_number"] = logger_serial_number
+        spike_dict_annotated["file_name"] = file_name
         return spike_dict_annotated
