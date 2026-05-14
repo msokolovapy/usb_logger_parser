@@ -1,7 +1,9 @@
-from src.usb_logger_parser.app import logger
 import pandas as pd
 import os
 import sys
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 def read(file):

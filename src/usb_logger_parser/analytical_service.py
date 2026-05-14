@@ -1,14 +1,14 @@
-from src.usb_logger_parser.helper_functions import (
+import pandas as pd
+import numpy as np
+import math
+from datetime import timedelta
+from helper_functions import (
     parse_,
     get_extreme_date_time,
     get_extreme_temp,
     get_spike_duration,
     convert_timestamps,
 )
-import pandas as pd
-import numpy as np
-import math
-from datetime import timedelta
 
 
 class AnalyticalService:

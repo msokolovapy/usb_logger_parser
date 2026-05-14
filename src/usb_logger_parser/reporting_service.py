@@ -1,6 +1,17 @@
 from xlsxwriter import Workbook
 
 
+class ReportingService:
+    def __init__(self):
+        pass
+
+    def report_spike_dict_(self, spike_dicts):
+        pass
+
+    def report_data_(self, storage_units):
+        pass
+
+
 class XLSXReport:
     def __init__(self, loggers):
         self._loggers = loggers

@@ -4,12 +4,7 @@ from unittest.mock import Mock, MagicMock
 from unittest.mock import patch
 import pandas as pd
 from pandas import Timestamp
-from src.usb_logger_parser.app import logger
-from src.usb_logger_parser.storage_units import (
-    StorageCondition,
-    Fridge,
-    create_storage_condition_manually,
-)
+import logging
 from src.usb_logger_parser.helper_functions import (
     read,
     parse_,
@@ -21,7 +16,15 @@ from src.usb_logger_parser.helper_functions import (
     get_spike_duration,
     convert_timestamps
 )
+from src.usb_logger_parser.storage_units import (
+    StorageCondition,
+    Fridge,
+    create_storage_condition_manually,
+)
+
 from src.usb_logger_parser.analytical_service import AnalyticalService
+
+logger = logging.getLogger(__name__)
 
 SAMPLE_DF = pd.DataFrame(
     {
