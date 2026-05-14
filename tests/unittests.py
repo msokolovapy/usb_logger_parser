@@ -1,5 +1,6 @@
+import datetime
 import unittest
-from unittest.mock import Mock
+from unittest.mock import Mock, MagicMock
 from unittest.mock import patch
 import pandas as pd
 from pandas import Timestamp
@@ -18,6 +19,7 @@ from src.usb_logger_parser.helper_functions import (
     get_extreme_date_time,
     get_extreme_temp,
     get_spike_duration,
+    convert_timestamps
 )
 from src.usb_logger_parser.analytical_service import AnalyticalService
 
@@ -219,7 +221,15 @@ class TestHelperFunctions(unittest.TestCase):
         )
         spike_duration = get_spike_duration(sample_df_slice)
         self.assertEqual(spike_duration, 1460)
-
+    
+    def test_convert_timestamps(self):
+        sample_df = pd.DataFrame({
+                                'extreme_date_time' : [Timestamp("2020-03-15 10:20:00")],
+                                'spike_date': [Timestamp('2020-03-15')]
+                                })
+        result = convert_timestamps(sample_df)
+        self.assertEqual(result['extreme_date_time'][0], datetime.datetime(2020, 3, 15, 10, 20))
+        self.assertEqual(result['spike_date'][0], datetime.date(2020, 3, 15))
 
 class TestAnalyticalServiceInit(unittest.TestCase):
     def test_analyt_service_init(self):
@@ -251,7 +261,9 @@ class TestAnalyzeSpikes(unittest.TestCase):
                 AnalyticalService, "check_against_limits"
             ) as mock_check_limits,
             patch.object(AnalyticalService, "find_mkt") as mock_mkt,
-            patch.object(AnalyticalService, "annotate_spike_dict_with_metadata") as mock_annotate_dict,
+            patch.object(
+                AnalyticalService, "annotate_spike_dict_with_metadata"
+            ) as mock_annotate_dict,
         ):
             mock_add_status.side_effect = ["df_added_status"]
             mock_cumulat_id.side_effect = ["df_with_cumulat_spike_id"]
@@ -261,14 +273,15 @@ class TestAnalyzeSpikes(unittest.TestCase):
             mock_renumber_spikes.return_value = "df_renumbered_spikes"
             mock_check_limits.return_value = "df_checked_against_limits"
             mock_mkt.return_value = "spike_dict_mkt_calculated"
-            mock_annotate_dict.return_value = 'spike_dict_annotated'
+            mock_annotate_dict.return_value = "spike_dict_annotated"
 
             result = self.analytical_service.analyze_spikes([self.unit])
 
-            pd.testing.assert_frame_equal(mock_add_status.call_args[0][0], self.unit.temp_data)
+            pd.testing.assert_frame_equal(
+                mock_add_status.call_args[0][0], self.unit.temp_data
+            )
             self.assertEqual(mock_add_status.call_args[0][1], 2.0)
             self.assertEqual(mock_add_status.call_args[0][2], 8.0)
-
 
             mock_cumulat_id.assert_called_with("df_added_status")
             mock_last_spike.assert_called_with("df_with_cumulat_spike_id")
@@ -276,18 +289,22 @@ class TestAnalyzeSpikes(unittest.TestCase):
             mock_excursions_df.assert_called_with("df_last_spike_added", "df_extremes")
             mock_renumber_spikes.assert_called_with("df_excursions")
             mock_check_limits.assert_called_with(
-
-                "df_renumbered_spikes", self.unit.spike_duration, self.unit.total_spikes_duration
+                "df_renumbered_spikes",
+                self.unit.spike_duration,
+                self.unit.total_spikes_duration,
             )
             mock_mkt.assert_called_with(
                 "df_checked_against_limits", self.unit.temp_data
             )
-            mock_annotate_dict.assert_called_with('spike_dict_mkt_calculated', 'ACP169 BU_FZ156', '052297777', 'dummy_txt')
+            mock_annotate_dict.assert_called_with(
+                "spike_dict_mkt_calculated", "ACP169 BU_FZ156", "052297777", "dummy_txt"
+            )
 
             self.assertEqual(result, ["spike_dict_annotated"])
-        
+
         spike_dict = self.analytical_service.analyze_spikes([self.unit])
-        self.fail('finish testing')
+        print(spike_dict)
+        self.fail("finish testing")
 
     def test_add_status_column(self):
         sample_df = pd.DataFrame(
@@ -769,11 +786,17 @@ class TestAnalyzeSpikes(unittest.TestCase):
         self.assertTrue((df_checked_against_limits["spike_status"] == "Pass").all())
 
     def test_find_mkt(self):
-        with patch.object(
-            AnalyticalService, "calculate_mkt_24hr_window", autospec=True
-        ) as mock_mkt:
+        with (
+            patch.object(
+                AnalyticalService, "calculate_mkt_24hr_window", autospec=True
+            ) as mock_mkt,
+            patch(
+                "src.usb_logger_parser.analytical_service.convert_timestamps"
+            ) as mock_convert_timestamps,
+        ):
             self.analytical_service.find_mkt(pd.DataFrame({}), pd.DataFrame({}))
             mock_mkt.assert_called()
+            mock_convert_timestamps.assert_called()
 
     def test_calculate_mkt_24hr_window(self):
         sample_row = pd.Series(

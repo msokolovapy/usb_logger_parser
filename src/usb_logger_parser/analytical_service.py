@@ -3,6 +3,7 @@ from src.usb_logger_parser.helper_functions import (
     get_extreme_date_time,
     get_extreme_temp,
     get_spike_duration,
+    convert_timestamps,
 )
 import pandas as pd
 import numpy as np
@@ -120,7 +121,7 @@ class AnalyticalService:
             .groupby("cumulat_spike_id")
             .agg(
                 extreme_temp=("celsius", lambda x: get_extreme_temp(x)),
-                spike_date=("date_time", lambda x: x.dt.date.min()),
+                spike_date=("date_time", lambda x: x.dt.floor('D').min()),
                 extreme_date_time=("date_time", lambda x: get_extreme_date_time(x, df)),
                 spike_duration_mins=("date_time", lambda x: get_spike_duration(x)),
             )
@@ -156,8 +157,8 @@ class AnalyticalService:
         df_excursions["mkt"] = df_excursions.apply(
             self.calculate_mkt_24hr_window, df=original_df, axis=1
         )
-        #converti Timedelta to datetime object and pack everything into a list of dictionaries
-        df_excursions['extreme_date_time'] = pd.to_datetime(df_excursions['extreme_date_time']).dt.to_pydatetime()
+        # converti Timestamp to datetime object and pack everything into a list of dictionaries
+        df_excursions = convert_timestamps(df_excursions)
         return df_excursions.to_dict("records")
 
     def calculate_mkt_24hr_window(self, row, df):

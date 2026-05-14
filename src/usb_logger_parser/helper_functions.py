@@ -97,3 +97,9 @@ def get_extreme_date_time(pandas_series_date_time, df):
 def get_extreme_temp(pandas_series_celsius):
     mask = pandas_series_celsius.abs().idxmax()
     return pandas_series_celsius.loc[mask]
+
+def convert_timestamps(df):
+    df['extreme_date_time'] = pd.to_datetime(df['extreme_date_time']).dt.to_pydatetime()
+    df['spike_date'] = pd.to_datetime(df['spike_date']).dt.date
+    return df
+    
