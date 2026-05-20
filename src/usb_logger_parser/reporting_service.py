@@ -1,4 +1,9 @@
 from xlsxwriter import Workbook
+import logging
+
+from src.usb_logger_parser.helper_functions import data_collection_frequency_check
+
+logger = logging.getLogger(__name__)
 
 
 class ReportingService:
@@ -9,11 +14,16 @@ class ReportingService:
         pass
 
     def report_data_(self, storage_units):
-        pass
+        temp_data_list = [unit.temp_data.copy() for unit in storage_units]
+        if data_collection_frequency_check(temp_data_list):
+            return XLSXGraph(temp_data_list)
+        logger.warning("Mismatch of USB data loggers's data collection frequencies")
+        raise ValueError("Mismatch of USB data loggers's data collection frequencies")
+            
 
 
-class XLSXReport:
-    def __init__(self, loggers):
+class XLSXGraph:
+    def __init__(self, df):
         self._loggers = loggers
         self._file_name = self.get_file_name()
         self._wb = Workbook(f"{self._file_name}.xlsx")
@@ -21,7 +31,7 @@ class XLSXReport:
         self._data_location = {}
 
     @classmethod
-    def create_from(cls, loggers):
+    def create_for_(cls, loggers):
         if data_collection_frequency_check(loggers):
             return cls(loggers)
         return cls(None)

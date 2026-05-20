@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 import math
 from datetime import timedelta
-from helper_functions import (
+from src.usb_logger_parser.helper_functions import (
     parse_,
     get_extreme_date_time,
     get_extreme_temp,

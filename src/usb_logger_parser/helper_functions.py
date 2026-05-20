@@ -105,3 +105,8 @@ def convert_timestamps(df):
     df['spike_date'] = pd.to_datetime(df['spike_date']).dt.date
     return df
     
+def data_collection_frequency_check(df_list):
+    if len(df_list) == 1:
+        return True #test always passes for one storage unit as there is nothing to compare it to
+    
+    

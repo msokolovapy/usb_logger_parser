@@ -14,7 +14,8 @@ from src.usb_logger_parser.helper_functions import (
     get_extreme_date_time,
     get_extreme_temp,
     get_spike_duration,
-    convert_timestamps
+    convert_timestamps,
+    data_collection_frequency_check,
 )
 from src.usb_logger_parser.storage_units import (
     StorageCondition,
@@ -23,6 +24,10 @@ from src.usb_logger_parser.storage_units import (
 )
 
 from src.usb_logger_parser.analytical_service import AnalyticalService
+from src.usb_logger_parser.reporting_service import (
+    ReportingService,
+    XLSXGraph,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -233,6 +238,11 @@ class TestHelperFunctions(unittest.TestCase):
         result = convert_timestamps(sample_df)
         self.assertEqual(result['extreme_date_time'][0], datetime.datetime(2020, 3, 15, 10, 20))
         self.assertEqual(result['spike_date'][0], datetime.date(2020, 3, 15))
+
+    def test_data_collection_frequency_check(self):
+        self.fail('finish testing')
+        
+
 
 class TestAnalyticalServiceInit(unittest.TestCase):
     def test_analyt_service_init(self):
@@ -865,6 +875,18 @@ class TestAnalyzeSpikes(unittest.TestCase):
         self.assertEqual(result["logger_id"], "ACP169 BU_FZ156")
         self.assertEqual(result["logger_serial_number"], "052297777")
         self.assertEqual(result["file_name"], "dummy_txt")
+
+class TestReportingService(unittest.TestCase):
+    def setUp(self):
+        self.reporting_service = ReportingService()
+        self.unit = Fridge(*parse_(SAMPLE_DF), "dummy_txt")
+    def tearDown(self):
+        pass
+    
+    def test_report_data_(self):
+        storage_units = [self.unit]
+        result = self.reporting_service.report_data_(storage_units)
+        self.assertIsInstance(result, XLSXGraph)
 
 
 if __name__ == "__main__":
