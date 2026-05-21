@@ -14,9 +14,8 @@ class ReportingService:
         pass
 
     def report_data_(self, storage_units):
-        temp_data_list = [unit.temp_data.copy() for unit in storage_units]
-        if data_collection_frequency_check(temp_data_list):
-            return XLSXGraph(temp_data_list)
+        if data_collection_frequency_check(storage_units):
+            return XLSXGraph(storage_units)
         logger.warning("Mismatch of USB data loggers's data collection frequencies")
         raise ValueError("Mismatch of USB data loggers's data collection frequencies")
             

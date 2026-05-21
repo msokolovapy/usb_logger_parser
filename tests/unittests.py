@@ -153,6 +153,7 @@ class TestHelperFunctions(unittest.TestCase):
         self.logger_id = "ACPL01"
         self.serial_numb = "00000001"
         self.file_basename = "ACPL234_ACPL01_09Apr2026"
+        self.unit = Fridge(*parse_(SAMPLE_DF), 'dummy.txt')
 
     def tearDown(self):
         pass
@@ -240,7 +241,11 @@ class TestHelperFunctions(unittest.TestCase):
         self.assertEqual(result['spike_date'][0], datetime.date(2020, 3, 15))
 
     def test_data_collection_frequency_check(self):
-        self.fail('finish testing')
+        with patch('src.usb_logger_parser.helper_functions.get_average_data_collect_frequency') as mock_ave_data_coll_freq:
+            mock_ave_data_coll_freq.side_effect = [10.0, 20.12]
+            storage_units = [self.unit, self.unit]
+            result = data_collection_frequency_check(storage_units)
+            print(result)
         
 
 

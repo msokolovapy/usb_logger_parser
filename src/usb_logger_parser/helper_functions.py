@@ -2,6 +2,7 @@ import pandas as pd
 import os
 import sys
 import logging
+from collections import Counter
 
 logger = logging.getLogger(__name__)
 
@@ -100,13 +101,28 @@ def get_extreme_temp(pandas_series_celsius):
     mask = pandas_series_celsius.abs().idxmax()
     return pandas_series_celsius.loc[mask]
 
+
 def convert_timestamps(df):
-    df['extreme_date_time'] = pd.to_datetime(df['extreme_date_time']).dt.to_pydatetime()
-    df['spike_date'] = pd.to_datetime(df['spike_date']).dt.date
+    df["extreme_date_time"] = pd.to_datetime(df["extreme_date_time"]).dt.to_pydatetime()
+    df["spike_date"] = pd.to_datetime(df["spike_date"]).dt.date
     return df
-    
-def data_collection_frequency_check(df_list):
-    if len(df_list) == 1:
-        return True #test always passes for one storage unit as there is nothing to compare it to
-    
-    
+
+
+def data_collection_frequency_check(storage_units):
+    if len(storage_units) == 1:
+        return True  # test always passes for one storage unit as there is nothing to compare it to
+    freq_counter = Counter(unit.logger.ave_data_coll_freq for unit in storage_units)
+    most_common_value = freq_counter.most_common()
+    for unit in storage_units:
+        if unit.logger.ave_data_coll_freq != most_common_value:
+            logger.warning(
+                    f"Data frequency collection for logger {unit.logger.id} differs from the rest of the temperature data collected. To ensure meaningful comparison, remove logger {unit.logger.id} and try again"
+            )
+            raise ValueError(
+                    f"Data frequency collection for logger {unit.logger.id} differs from the rest of the temperature data collected. To ensure meaningful comparison, remove logger {unit.logger.id} and try again"
+                )
+    return freq_counter
+
+
+def get_average_data_collect_frequency(df):
+    pass
