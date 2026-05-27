@@ -16,6 +16,7 @@ from src.usb_logger_parser.helper_functions import (
     get_spike_duration,
     convert_timestamps,
     data_collection_frequency_check,
+    get_ave_data_coll_freq,
 )
 from src.usb_logger_parser.storage_units import (
     StorageCondition,
@@ -24,9 +25,11 @@ from src.usb_logger_parser.storage_units import (
 )
 
 from src.usb_logger_parser.analytical_service import AnalyticalService
+
 from src.usb_logger_parser.reporting_service import (
     ReportingService,
     XLSXGraph,
+    XLSXSummary,
 )
 
 logger = logging.getLogger(__name__)
@@ -149,11 +152,12 @@ class TestColdChainUnit(unittest.TestCase):
 
 class TestHelperFunctions(unittest.TestCase):
     def setUp(self):
-        self.df_temp_data = SAMPLE_DF
-        self.logger_id = "ACPL01"
-        self.serial_numb = "00000001"
         self.file_basename = "ACPL234_ACPL01_09Apr2026"
-        self.unit = Fridge(*parse_(SAMPLE_DF), 'dummy.txt')
+        self.df_temp_data = SAMPLE_DF
+        self.logger_id = "ACP169 BU_FZ156"
+        self.serial_numb = "052297777"
+        self.ave_data_coll_freq = 10.0
+        self.unit = Fridge(self.df_temp_data, self.logger_id, self.serial_numb, self.ave_data_coll_freq, self.file_basename)
 
     def tearDown(self):
         pass
@@ -230,23 +234,60 @@ class TestHelperFunctions(unittest.TestCase):
         )
         spike_duration = get_spike_duration(sample_df_slice)
         self.assertEqual(spike_duration, 1460)
-    
+
     def test_convert_timestamps(self):
-        sample_df = pd.DataFrame({
-                                'extreme_date_time' : [Timestamp("2020-03-15 10:20:00")],
-                                'spike_date': [Timestamp('2020-03-15')]
-                                })
+        sample_df = pd.DataFrame(
+            {
+                "extreme_date_time": [Timestamp("2020-03-15 10:20:00")],
+                "spike_date": [Timestamp("2020-03-15")],
+            }
+        )
         result = convert_timestamps(sample_df)
-        self.assertEqual(result['extreme_date_time'][0], datetime.datetime(2020, 3, 15, 10, 20))
-        self.assertEqual(result['spike_date'][0], datetime.date(2020, 3, 15))
+        self.assertEqual(
+            result["extreme_date_time"][0], datetime.datetime(2020, 3, 15, 10, 20)
+        )
+        self.assertEqual(result["spike_date"][0], datetime.date(2020, 3, 15))
 
     def test_data_collection_frequency_check(self):
-        with patch('src.usb_logger_parser.helper_functions.get_average_data_collect_frequency') as mock_ave_data_coll_freq:
-            mock_ave_data_coll_freq.side_effect = [10.0, 20.12]
-            storage_units = [self.unit, self.unit]
-            result = data_collection_frequency_check(storage_units)
-            print(result)
-        
+        units_pass = [Mock() for _ in range(4)]
+        freq_pass = 10.0
+        for mock_unit in units_pass:
+            mock_unit.logger.ave_data_coll_freq = freq_pass
+
+        units_fail = [Mock() for _ in range(4)]
+        fail_dict = [
+            (10.0, "ACPL01"),
+            (10.0, "ACPL02"),
+            (10.0, "ACPL03"),
+            (20.3, "ACPL04"),
+        ]
+        for mock_unit, attributes in zip(units_fail, fail_dict):
+            ave_data_coll_freq, logger_id = attributes
+            mock_unit.logger.ave_data_coll_freq = ave_data_coll_freq
+            mock_unit.logger.id = logger_id
+
+        result = data_collection_frequency_check(units_pass)
+        self.assertTrue(result)
+        with self.assertRaises(ValueError):
+            result = data_collection_frequency_check(units_fail)
+
+
+    def test_get_ave_data_coll_freq(self):
+        df = pd.DataFrame({"date_time": [
+                        Timestamp("2020-03-15 10:20:00"),
+                        Timestamp("2020-03-15 10:30:00"),
+                        Timestamp("2020-03-15 10:40:00"),
+                        Timestamp("2020-03-16 10:30:00"),
+                        Timestamp("2020-03-16 10:40:00"),
+                        Timestamp("2020-03-16 10:50:00"),
+                        Timestamp("2020-03-16 11:00:00"),
+                        Timestamp("2020-03-16 11:10:00"),
+                        Timestamp("2020-03-16 11:20:00"),
+                        Timestamp("2020-03-16 11:30:00"),
+                        Timestamp("2020-03-16 11:40:00"),
+                    ]})
+        result = get_ave_data_coll_freq(df)
+        self.assertEqual(result, 152.0)
 
 
 class TestAnalyticalServiceInit(unittest.TestCase):
@@ -881,17 +922,29 @@ class TestAnalyzeSpikes(unittest.TestCase):
         self.assertEqual(result["logger_serial_number"], "052297777")
         self.assertEqual(result["file_name"], "dummy_txt")
 
+
 class TestReportingService(unittest.TestCase):
     def setUp(self):
         self.reporting_service = ReportingService()
-        self.unit = Fridge(*parse_(SAMPLE_DF), "dummy_txt")
+        self.unit = Fridge(*parse_(SAMPLE_DF), 152.0, "dummy_txt")
+
     def tearDown(self):
         pass
-    
+
     def test_report_data_(self):
         storage_units = [self.unit]
         result = self.reporting_service.report_data_(storage_units)
         self.assertIsInstance(result, XLSXGraph)
+
+class TestXLSXSummary(unittest.TestCase):
+    def test_xlsx_summary_init(self):
+        spike_dict = {}
+        result = XLSXSummary(spike_dict)
+        self.assertIsNotNone(result)
+        self.assertIsNotNone(result.spike_dict)
+        self.assertIsNotNone(result.wb)
+        self.assertIsNotNone(result.ws)
+        self.assertEqual(result.file_name, '2026-05-25_spikes_summary')
 
 
 if __name__ == "__main__":

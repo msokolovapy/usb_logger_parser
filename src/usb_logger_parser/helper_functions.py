@@ -61,24 +61,26 @@ def validate_(file):
         df = pd.read_csv(file, encoding="latin-1")
         if df.empty:
             logger.warning(f"Empty dataframe when trying to load {file}")
-            sys.exit(1)
+            raise ValueError(f"Empty dataframe when trying to load {file}")
 
         required_columns = ["Time", "Celsius(°C)"]
         missing_columns = set(required_columns) - set(df.columns)
         if missing_columns:
             logger.warning(f"Some columns are missing: {(', ').join(missing_columns)}")
-            sys.exit(1)
+            raise KeyError(f"Some columns are missing: {(', ').join(missing_columns)}")
 
         for column in required_columns:
             if df[column].isna().any():
                 logger.warning(f"Some values are missing in '{column}' column")
-                sys.exit(1)
+                raise ValueError(f"Some values are missing in '{column}' column")
         return file
 
     except FileNotFoundError:
         logger.error(f"No file '{file}' found")
+        raise
     except Exception as e:
         logger.exception(f"Unexpected error ({e}) occured when trying to load {file}")
+        raise
     sys.exit(1)
 
 
@@ -110,9 +112,9 @@ def convert_timestamps(df):
 
 def data_collection_frequency_check(storage_units):
     if len(storage_units) == 1:
-        return True  # test always passes for one storage unit as there is nothing to compare it to
+        return True  # test always passes for one storage unit as there is nothing to compare this one storage unit to
     freq_counter = Counter(unit.logger.ave_data_coll_freq for unit in storage_units)
-    most_common_value = freq_counter.most_common()
+    most_common_value = freq_counter.most_common()[0][0]
     for unit in storage_units:
         if unit.logger.ave_data_coll_freq != most_common_value:
             logger.warning(
@@ -121,8 +123,10 @@ def data_collection_frequency_check(storage_units):
             raise ValueError(
                     f"Data frequency collection for logger {unit.logger.id} differs from the rest of the temperature data collected. To ensure meaningful comparison, remove logger {unit.logger.id} and try again"
                 )
-    return freq_counter
+    return True
 
 
-def get_average_data_collect_frequency(df):
-    pass
+def get_ave_data_coll_freq(df):
+    data_coll_freq_series = df['date_time'].diff()
+    ave_data_coll_freq = round(data_coll_freq_series.mean().total_seconds() / 60, 6)
+    return ave_data_coll_freq
