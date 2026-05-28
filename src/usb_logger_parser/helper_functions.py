@@ -130,3 +130,9 @@ def get_ave_data_coll_freq(df):
     data_coll_freq_series = df['date_time'].diff()
     ave_data_coll_freq = round(data_coll_freq_series.mean().total_seconds() / 60, 6)
     return ave_data_coll_freq
+
+
+def parse_for_reporting_(unit):
+	data_row_min, data_row_max = ()
+	prepared_temp_data, data_width = ()
+	return data_row_min, data_row_max, prepared_temp_data, data_width

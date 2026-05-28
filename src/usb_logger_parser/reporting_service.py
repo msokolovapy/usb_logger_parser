@@ -70,9 +70,9 @@ class XLSXGraph:
         self.data_to_graph = data_to_graph
         self.start_col = 10
         self.file_name = self.get_file_name()
-        self.wb = Workbook(f"{self._file_name}.xlsx")
+        self.wb = Workbook(f"{self.file_name}.xlsx")
         self.ws = (
-            self.wb.add_workbook()
+            self.wb.add_worksheet()
         )  # keeping worksheet as attribute as xlsxwriter cannot re-open worksheets
 
     def get_file_name(self):
@@ -85,23 +85,24 @@ class XLSXGraph:
             raise ValueError(f"No data for visualisation was provided")
 
         for data in self.data_to_graph:
-            temp_data = data[unit]["data"]
-            data_width = data[unit]["data_width"]
+            for prepared_data in data.values():
+                temp_data = prepared_data["data"]
+                data_width = prepared_data["data_width"]
 
-            for row_idx, data_row in enumerate(temp_data):
-                for column_idx, data_column in enumerate(data_row):
-                    if isinstance(data_column, datetime):
-                        date_format = self.wb.add_format(
-                            {"num_format": "yyyy-mm-dd hh:mm:ss"}
-                        )
-                        self.ws.write(
-                            row_idx,
-                            self.start_col + column_idx,
-                            data_column,
-                            date_format,
-                        )  # to ensure datetime stamps are written properly in xlsx file
-                    else:
-                        self.ws.write(row_idx, self.start_col + column_idx, data_column)
+                for row_idx, data_row in enumerate(temp_data):
+                    for column_idx, data_column in enumerate(data_row):
+                        if isinstance(data_column, datetime):
+                            date_format = self.wb.add_format(
+                                {"num_format": "yyyy-mm-dd hh:mm:ss"}
+                            )
+                            self.ws.write(
+                                row_idx,
+                                self.start_col + column_idx,
+                                data_column,
+                                date_format,
+                            )  # to ensure datetime stamps are written properly in xlsx file
+                        else:
+                            self.ws.write(row_idx, self.start_col + column_idx, data_column)
 
             self.start_col = self.start_col + data_width + 1
 

@@ -17,6 +17,7 @@ from src.usb_logger_parser.helper_functions import (
     convert_timestamps,
     data_collection_frequency_check,
     get_ave_data_coll_freq,
+    parse_for_reporting_,
 )
 from src.usb_logger_parser.storage_units import (
     StorageCondition,
@@ -30,6 +31,7 @@ from src.usb_logger_parser.reporting_service import (
     ReportingService,
     XLSXGraph,
     XLSXSummary,
+    XYAxesBounds
 )
 
 logger = logging.getLogger(__name__)
@@ -157,7 +159,13 @@ class TestHelperFunctions(unittest.TestCase):
         self.logger_id = "ACP169 BU_FZ156"
         self.serial_numb = "052297777"
         self.ave_data_coll_freq = 10.0
-        self.unit = Fridge(self.df_temp_data, self.logger_id, self.serial_numb, self.ave_data_coll_freq, self.file_basename)
+        self.unit = Fridge(
+            self.df_temp_data,
+            self.logger_id,
+            self.serial_numb,
+            self.ave_data_coll_freq,
+            self.file_basename,
+        )
 
     def tearDown(self):
         pass
@@ -271,21 +279,24 @@ class TestHelperFunctions(unittest.TestCase):
         with self.assertRaises(ValueError):
             result = data_collection_frequency_check(units_fail)
 
-
     def test_get_ave_data_coll_freq(self):
-        df = pd.DataFrame({"date_time": [
-                        Timestamp("2020-03-15 10:20:00"),
-                        Timestamp("2020-03-15 10:30:00"),
-                        Timestamp("2020-03-15 10:40:00"),
-                        Timestamp("2020-03-16 10:30:00"),
-                        Timestamp("2020-03-16 10:40:00"),
-                        Timestamp("2020-03-16 10:50:00"),
-                        Timestamp("2020-03-16 11:00:00"),
-                        Timestamp("2020-03-16 11:10:00"),
-                        Timestamp("2020-03-16 11:20:00"),
-                        Timestamp("2020-03-16 11:30:00"),
-                        Timestamp("2020-03-16 11:40:00"),
-                    ]})
+        df = pd.DataFrame(
+            {
+                "date_time": [
+                    Timestamp("2020-03-15 10:20:00"),
+                    Timestamp("2020-03-15 10:30:00"),
+                    Timestamp("2020-03-15 10:40:00"),
+                    Timestamp("2020-03-16 10:30:00"),
+                    Timestamp("2020-03-16 10:40:00"),
+                    Timestamp("2020-03-16 10:50:00"),
+                    Timestamp("2020-03-16 11:00:00"),
+                    Timestamp("2020-03-16 11:10:00"),
+                    Timestamp("2020-03-16 11:20:00"),
+                    Timestamp("2020-03-16 11:30:00"),
+                    Timestamp("2020-03-16 11:40:00"),
+                ]
+            }
+        )
         result = get_ave_data_coll_freq(df)
         self.assertEqual(result, 152.0)
 
@@ -922,19 +933,67 @@ class TestAnalyzeSpikes(unittest.TestCase):
         self.assertEqual(result["logger_serial_number"], "052297777")
         self.assertEqual(result["file_name"], "dummy_txt")
 
-
 class TestReportingService(unittest.TestCase):
     def setUp(self):
         self.reporting_service = ReportingService()
-        self.unit = Fridge(*parse_(SAMPLE_DF), 152.0, "dummy_txt")
+        df_temp_data = pd.DataFrame(
+            {
+                "date_time": [
+                    Timestamp("2020-03-16 10:30:00"),
+                    Timestamp("2020-03-16 10:40:00"),
+                    Timestamp("2020-03-16 10:50:00"),
+                    Timestamp("2020-03-16 11:00:00"),
+                    Timestamp("2020-03-16 11:10:00"),
+                ],
+                "celsius": [
+                    0.0,
+                    0.5,
+                    1.0,
+                    1.5,
+                    2.0,
+                ],
+            }
+        )
+        self.unit = Fridge(
+            df_temp_data,
+            logger_id = "ACP169 BU_FZ156",
+            serial_numb =  "052297777",
+            ave_data_coll_freq = 152.0,
+            file_basename = 'dummy.txt',
+        )
 
     def tearDown(self):
         pass
 
     def test_report_data_(self):
-        storage_units = [self.unit]
-        result = self.reporting_service.report_data_(storage_units)
-        self.assertIsInstance(result, XLSXGraph)
+        with patch.object(
+            ReportingService, "update_axes_range"
+        ) as mock_update_axes_range:
+            mock_update_axes_range.return_value = {
+                self.unit: {
+                    "data": "prepared_temp_data",
+                    "xy_axes_bounds": "xy_axes_bounds",
+                    "data_width": "data_width",
+                }
+            }
+            storage_units = [self.unit]
+            result = self.reporting_service.report_data_(storage_units)
+            self.assertIsInstance(result, XLSXGraph)
+            self.fail('finish testing update_axes_bounds!')
+
+    def test_insert_data(self):
+            prepared_data = [{
+                self.unit: {
+                    "data": [['row_numb', 'date_time', 'celsius', 'high_alarm', 'low_alarm']],
+                    "xy_axes_bounds": "xy_axes_bounds",
+                    "data_width": 5,
+                }
+            }]
+            xlsxgraph = XLSXGraph(prepared_data)
+            result = xlsxgraph.insert_data()
+            self.assertEqual(xlsxgraph.start_col, 16)
+            
+
 
 class TestXLSXSummary(unittest.TestCase):
     def test_xlsx_summary_init(self):
@@ -944,8 +1003,32 @@ class TestXLSXSummary(unittest.TestCase):
         self.assertIsNotNone(result.spike_dict)
         self.assertIsNotNone(result.wb)
         self.assertIsNotNone(result.ws)
-        self.assertEqual(result.file_name, '2026-05-25_spikes_summary')
+        self.assertEqual(result.file_name, "2026-05-25_spikes_summary")
 
+
+class TestXYAxesBounds(unittest.TestCase):
+    def test_xy_axes_bounds_init(self):
+        xy_axes_bounds = XYAxesBounds()
+        self.assertIsNotNone(xy_axes_bounds)
+        self.assertEqual(xy_axes_bounds.y_row_min, 0)
+
+
+class TestXLSXGraph(unittest.TestCase):
+    def test_xlsxgraph_init(self):
+        data_to_graph = [
+            {
+                'unit': {
+                    "data": "prepared_temp_data",
+                    "xy_axes_bounds": "xy_axes_bounds",
+                    "data_width": "data_width",
+                }
+            }
+        ]
+        today = datetime.datetime.now().strftime("%Y-%m-%d")
+        result = XLSXGraph(data_to_graph)
+        self.assertIsNotNone(result)
+        self.assertEqual(result.start_col, 10)
+        self.assertEqual(result.file_name, f'{today}_usb_data_loggers_graph')
 
 if __name__ == "__main__":
     unittest.main()
