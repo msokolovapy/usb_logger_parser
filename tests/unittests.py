@@ -984,7 +984,7 @@ class TestReportingService(unittest.TestCase):
     def test_insert_data(self):
             prepared_data = [{
                 self.unit: {
-                    "data": [['row_numb', 'date_time', 'celsius', 'high_alarm', 'low_alarm']],
+                    "data": [['row_numb', '2020-03-16 10:30:00', 'celsius', 'high_alarm', 'low_alarm']],
                     "xy_axes_bounds": "xy_axes_bounds",
                     "data_width": 5,
                 }

@@ -22,29 +22,40 @@ class ReportingService:
                 raise ValueError(
                     "Mismatch of USB data loggers' data collection frequencies"
                 )
-            prepared_data = self.update_axes_range(unit)
+            prepared_data = self.prepare_data_for_reporting_(unit)
             self.data_to_graph.append(prepared_data)
         return XLSXGraph(self.data_to_graph)
 
-    def update_axes_range(unit):
-        data_row_min, data_row_max, prepared_temp_data, data_width = (
-            parse_for_reporting_(unit)
+    def extract_to_dict(self, df):
+        data_width = df.shape[1]
+        df["date_time"] = df["date_time"].astype(str)
+        headers = df.columns.to_list()
+        values = df.values.to_list()
+        data = values.insert(
+            0, columns
+        )  # to obtain data as a list of lists for easy writing to xlsx workbook later
+        return data, data_width
+
+    def insert_metadata_header_(self, data, logger_metadata):
+        data_row_min = 0
+        for metadata in logger_metadata:
+            metadata_header = [metadata, *[None] * (data_width - 1)]
+            data.insert(0, metadata_header)
+            data_row_min += 1
+        data_row_max = len(data)
+        return data_row_min, data_row_max, data
+
+    def prepare_data_for_reporting_(self, unit):
+        data, data_width = self.extract_to_dict(unit.temp_data)
+        logger_metadata = (unit.logger.id, unit.logger.serial_numb)
+        data_row_min, data_row_max, data_with_header = self.insert_metadata_header(
+            data, logger_metadata
         )
-        xy_axes_bounds = XYAxesBounds()
-
-        if data_row_max > xy_axes_bounds.x_row_max:
-            xy_axes_bounds.x_row_min = row_min
-            xy_axes_bounds.x_row_max = row_max
-            xy_axes_bounds.x_col_min = start_col
-
-        xy_axes_bounds.y_col_min = self.start_col + 2
-        xy_axes_bounds.y_row_min = row_min
-        xy_axes_bounds.y_row_max = row_max
-
         return {
             unit: {
-                "data": prepared_temp_data,
-                "xy_axes_bounds": xy_axes_bounds,
+                "data": data_with_header,
+                "data_row_min": data_row_min,
+                "data_row_max": data_row_max,
                 "data_width": data_width,
             }
         }
@@ -69,6 +80,12 @@ class XLSXGraph:
     def __init__(self, data_to_graph):
         self.data_to_graph = data_to_graph
         self.start_col = 10
+        self.x_axis_bounds = {
+            "col_min": self.start_col,
+            "col_max": 0,
+            "row_min": 0,
+            "row_max": 0,
+        }
         self.file_name = self.get_file_name()
         self.wb = Workbook(f"{self.file_name}.xlsx")
         self.ws = (
@@ -77,7 +94,7 @@ class XLSXGraph:
 
     def get_file_name(self):
         formatted_today = datetime.now().strftime("%Y-%m-%d")
-        return f"{formatted_today}_usb_data_loggers_graph"
+        return f"{formatted_today}_usb_loggers_graph"
 
     def insert_data(self):
         if not self.data_to_graph:
@@ -85,26 +102,32 @@ class XLSXGraph:
             raise ValueError(f"No data for visualisation was provided")
 
         for data in self.data_to_graph:
-            for prepared_data in data.values():
+            for _, prepared_data in data.items():
                 temp_data = prepared_data["data"]
                 data_width = prepared_data["data_width"]
+                data_row_min = prepared_data["data_row_min"]
+                data_row_max = prepared_data["data_row_max"]
+
+                y_axis_bounds = {
+                    "col_min": self.start_col + 2,
+                    "col_max": 0,
+                    "row_min": data_row_min,
+                    "row_max": data_row_max,
+                }
+
+                if (
+                    data_row_max > self.x_axis_bounds["row_max"]
+                ):  # longest x-axis is selected for saving and then overlaying in the chart
+                    self.x_axis_bounds["row_max"] = data_row_max
+                    self.x_axis_bounds["row_min"] = data_row_min
+                    self.x_axis_bounds["col_min"] = self.start_col
 
                 for row_idx, data_row in enumerate(temp_data):
                     for column_idx, data_column in enumerate(data_row):
-                        if isinstance(data_column, datetime):
-                            date_format = self.wb.add_format(
-                                {"num_format": "yyyy-mm-dd hh:mm:ss"}
-                            )
-                            self.ws.write(
-                                row_idx,
-                                self.start_col + column_idx,
-                                data_column,
-                                date_format,
-                            )  # to ensure datetime stamps are written properly in xlsx file
-                        else:
-                            self.ws.write(row_idx, self.start_col + column_idx, data_column)
+                        self.ws.write(row_idx, self.start_col + column_idx, data_column)
 
-            self.start_col = self.start_col + data_width + 1
+                self.start_col = self.start_col + data_width + 1
+                prepared_data[unit]["y_axis_bounds"] = y_axis_bounds
 
     def insert_graph(self):
         chart = self.wb.add_chart({"type": "scatter", "subtype": "smooth"})
@@ -114,66 +137,28 @@ class XLSXGraph:
         chart.set_legend({"position": "right"})
 
         for unit, data in self.data_to_graph.items():
-            xy_axes_bounds = data["xy_axes_bounds"]
+            y_axis_bounds = data["y_axis_bounds"]
             chart.add_series(
                 {
                     "name": unit.logger.id,
                     "categories": [
                         self.file_name,
-                        xy_axes_bounds.x_row_min,
-                        xy_axes_bounds.x_col_min,
-                        xy_axes_bounds.x_row_max,
-                        xy_axes_bounds.x_col_min,
+                        self.x_axis_bounds["row_min"],
+                        self.x_axis_bounds["col_min"],
+                        self.x_axis_bounds["row_max"],
+                        self.x_axis_bounds["col_max"],
                     ],
                     "values": [
                         self.file_name,
-                        xy_axes_bounds.y_row_min,
-                        xy_axes_bounds.y_col_min,
-                        xy_axes_bounds.y_row_max,
-                        xy_axes_bounds.y_col_min,
+                        y_axis_bounds["row_min"],
+                        y_axis_bounds["col_min"],
+                        y_axis_bounds["row_max"],
+                        y_axis_bounds["col_max"],
                     ],
                 }
             )
         self.ws.insert_chart("A1", chart)
         self.wb.close()
-
-
-class XYAxesBounds:
-    def __init__(self):
-        self.x_axis_bounds = {"col_min": 0, "col_max": 0, "row_min": 0, "row_max": 0}
-        self.y_axis_bounds = {"col_min": 0, "col_max": 0, "row_min": 0, "row_max": 0}
-
-    @property
-    def y_row_min(self):
-        return self.y_axis_bounds["row_min"]
-
-    @property
-    def y_row_max(self):
-        return self.y_axis_bounds["row_max"]
-
-    @property
-    def y_col_min(self):
-        return self.y_axis_bounds["col_min"]
-
-    @property
-    def y_col_max(self):
-        return self.y_axis_bounds["col_max"]
-
-    @property
-    def x_row_min(self):
-        return self.x_axis_bounds["row_min"]
-
-    @property
-    def x_row_max(self):
-        return self.x_axis_bounds["row_max"]
-
-    @property
-    def x_col_min(self):
-        return self.x_axis_bounds["col_min"]
-
-    @property
-    def x_col_max(self):
-        return self.x_axis_bounds["col_max"]
 
 
 # OLD Stuff here:
