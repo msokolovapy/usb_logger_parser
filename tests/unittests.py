@@ -17,7 +17,6 @@ from src.usb_logger_parser.helper_functions import (
     convert_timestamps,
     data_collection_frequency_check,
     get_ave_data_coll_freq,
-    parse_for_reporting_,
 )
 from src.usb_logger_parser.storage_units import (
     StorageCondition,
@@ -31,7 +30,6 @@ from src.usb_logger_parser.reporting_service import (
     ReportingService,
     XLSXGraph,
     XLSXSummary,
-    XYAxesBounds
 )
 
 logger = logging.getLogger(__name__)
@@ -116,40 +114,65 @@ class TestColdChainUnit(unittest.TestCase):
         self.df_temp_data = SAMPLE_DF
         self.logger_id = "ACPL01"
         self.serial_numb = "00001"
+        self.ave_data_coll_freq = 152.0
         self.file_basename = "ACPL234_ACPL01_09Apr2026"
 
     def tearDown(self):
         pass
 
-    @patch("src.usb_logger_parser.storage_units.create_storage_condition_manually")
-    @patch("src.usb_logger_parser.storage_units.get_user_confirmation")
-    @patch("src.usb_logger_parser.storage_units.get_average_temp")
-    @patch("src.usb_logger_parser.storage_units.read")
-    def test_create_cc_unit(
-        self, mock_read, mock_get_ave_temp, mock_user_confirmation, mock_manual_create
-    ):
-        file = "dummy.txt"
-        mock_read.return_value = (
-            self.df_temp_data,
-            self.logger_id,
-            self.serial_numb,
-            self.file_basename,
-        )
-        mock_get_ave_temp.return_value = 5.0
-        mock_user_confirmation.side_effect = ["abracadabra", "FG"]
-        mock_manual_create.return_value = Fridge(
-            self.df_temp_data, self.logger_id, self.serial_numb, self.file_basename
-        )
+    def test_create_cc_unit(self):
+        with (
+            patch(
+                "src.usb_logger_parser.helper_functions.pd.read_csv"
+            ) as mock_pandas_read,
+            patch(
+                "src.usb_logger_parser.helper_functions.validate_"
+            ) as mock_validate,
+            patch("src.usb_logger_parser.helper_functions.parse_") as mock_parse,
+            patch(
+                "src.usb_logger_parser.storage_units.create_storage_condition_manually"
+            ) as mock_manual_create,
+            patch(
+                "src.usb_logger_parser.storage_units.get_user_confirmation"
+            ) as mock_user_confirmation,
+            patch(
+                "src.usb_logger_parser.storage_units.get_average_temp"
+            ) as mock_get_ave_temp,
+            patch("src.usb_logger_parser.storage_units.read") as mock_read,
+            patch("src.usb_logger_parser.storage_units.get_ave_data_coll_freq") as mock_ave_data_coll_freq
+        ):
 
-        fridge = StorageCondition.create_from_(file)
-        self.assertIsNotNone(fridge)
-        self.assertEqual(fridge.low_alarm, 2.0)
-        self.assertEqual(fridge.high_alarm, 8.0)
-        self.assertEqual(fridge.spike_duration, 3600)
-        self.assertEqual(fridge.logger.id, "ACPL01")
-        self.assertEqual(fridge.logger.serial_numb, "00001")
-        self.assertEqual(fridge.temp_data.shape, (20, 6))
-        self.assertEqual(fridge.metadata, "ACPL234_ACPL01_09Apr2026")
+            file = "dummy.txt"
+
+            mock_pandas_read.return_value = "df"
+            mock_validate.return_value = "validated_dummy.txt"
+            mock_parse.return_value = ("parsed_df", 'logger_id', "serial_numb")
+            mock_read.return_value = (
+                self.df_temp_data,
+                self.logger_id,
+                self.serial_numb,
+                self.file_basename,
+            )
+            mock_get_ave_temp.return_value = 5.0
+            mock_user_confirmation.side_effect = ["abracadabra", "FG"]
+            mock_manual_create.return_value = Fridge(
+                self.df_temp_data,
+                self.logger_id,
+                self.serial_numb,
+                self.ave_data_coll_freq,
+                self.file_basename,
+            )
+
+            fridge = StorageCondition.create_from_(file)
+            self.assertIsNotNone(fridge)
+            self.assertEqual(fridge.low_alarm, 2.0)
+            self.assertEqual(fridge.high_alarm, 8.0)
+            self.assertEqual(fridge.spike_duration, 3600)
+            self.assertEqual(fridge.logger.id, "ACPL01")
+            self.assertEqual(fridge.logger.serial_numb, "00001")
+            self.assertEqual(fridge.temp_data.shape, (20, 6))
+            self.assertEqual(fridge.metadata, "ACPL234_ACPL01_09Apr2026")
+            self.fail('finish asserting mock calls and re-organizing mock order')
 
 
 class TestHelperFunctions(unittest.TestCase):
@@ -174,7 +197,7 @@ class TestHelperFunctions(unittest.TestCase):
     def test_create_storage_condition_manually(self, mock_input):
         mock_input.side_effect = ["abracadabra", "FG"]
         storage_condit = create_storage_condition_manually(
-            self.df_temp_data, self.logger_id, self.serial_numb, self.file_basename
+            self.df_temp_data, self.logger_id, self.serial_numb, self.ave_data_coll_freq,self.file_basename
         )
         self.assertIsNotNone(storage_condit)
         self.assertEqual(storage_condit.high_alert, 15.0)
@@ -310,7 +333,31 @@ class TestAnalyticalServiceInit(unittest.TestCase):
 class TestAnalyzeSpikes(unittest.TestCase):
     def setUp(self):
         self.analytical_service = AnalyticalService()
-        self.unit = Fridge(*parse_(SAMPLE_DF), "dummy_txt")
+        df_temp_data = pd.DataFrame(
+            {
+                "date_time": [
+                    Timestamp("2020-03-16 10:30:00"),
+                    Timestamp("2020-03-16 10:40:00"),
+                    Timestamp("2020-03-16 10:50:00"),
+                    Timestamp("2020-03-16 11:00:00"),
+                    Timestamp("2020-03-16 11:10:00"),
+                ],
+                "celsius": [
+                    0.0,
+                    0.5,
+                    1.0,
+                    1.5,
+                    2.0,
+                ],
+            }
+        )
+        self.unit = Fridge(
+            df_temp_data,
+            logger_id="ACP169 BU_FZ156",
+            serial_numb="052297777",
+            ave_data_coll_freq=152.0,
+            file_basename="dummy.txt",
+        )
 
     def tearDown(self):
         pass
@@ -367,7 +414,7 @@ class TestAnalyzeSpikes(unittest.TestCase):
                 "df_checked_against_limits", self.unit.temp_data
             )
             mock_annotate_dict.assert_called_with(
-                "spike_dict_mkt_calculated", "ACP169 BU_FZ156", "052297777", "dummy_txt"
+                "spike_dict_mkt_calculated", "ACP169 BU_FZ156", "052297777", "dummy.txt"
             )
 
             self.assertEqual(result, ["spike_dict_annotated"])
@@ -931,7 +978,8 @@ class TestAnalyzeSpikes(unittest.TestCase):
         )
         self.assertEqual(result["logger_id"], "ACP169 BU_FZ156")
         self.assertEqual(result["logger_serial_number"], "052297777")
-        self.assertEqual(result["file_name"], "dummy_txt")
+        self.assertEqual(result["file_name"], "dummy.txt")
+
 
 class TestReportingService(unittest.TestCase):
     def setUp(self):
@@ -956,79 +1004,81 @@ class TestReportingService(unittest.TestCase):
         )
         self.unit = Fridge(
             df_temp_data,
-            logger_id = "ACP169 BU_FZ156",
-            serial_numb =  "052297777",
-            ave_data_coll_freq = 152.0,
-            file_basename = 'dummy.txt',
+            logger_id="ACP169 BU_FZ156",
+            serial_numb="052297777",
+            ave_data_coll_freq=152.0,
+            file_basename="dummy.txt",
         )
 
     def tearDown(self):
         pass
 
     def test_report_data_(self):
-        with patch.object(
-            ReportingService, "update_axes_range"
-        ) as mock_update_axes_range:
-            mock_update_axes_range.return_value = {
-                self.unit: {
-                    "data": "prepared_temp_data",
-                    "xy_axes_bounds": "xy_axes_bounds",
-                    "data_width": "data_width",
-                }
+        sample_data = {
+            self.unit: {
+                "data": "data_with_header",
+                "data_row_min": "data_row_min",
+                "data_row_max": "data_row_max",
+                "data_width": "data_width",
             }
+        }
+
+        with patch.object(
+            ReportingService, "prepare_data_for_reporting_"
+        ) as mock_prepare_data:
+            mock_prepare_data.return_value = sample_data
             storage_units = [self.unit]
             result = self.reporting_service.report_data_(storage_units)
             self.assertIsInstance(result, XLSXGraph)
-            self.fail('finish testing update_axes_bounds!')
+            self.assertEqual(self.reporting_service.data_to_graph, [sample_data])
+            self.fail("finish testing update_axes_bounds!")
 
     def test_insert_data(self):
-            prepared_data = [{
+        self.fail("finish testing")
+        prepared_data = [
+            {
                 self.unit: {
-                    "data": [['row_numb', '2020-03-16 10:30:00', 'celsius', 'high_alarm', 'low_alarm']],
-                    "xy_axes_bounds": "xy_axes_bounds",
-                    "data_width": 5,
+                    "data": "data_with_header",
+                    "data_row_min": "data_row_min",
+                    "data_row_max": "data_row_max",
+                    "data_width": "data_width",
                 }
-            }]
-            xlsxgraph = XLSXGraph(prepared_data)
-            result = xlsxgraph.insert_data()
-            self.assertEqual(xlsxgraph.start_col, 16)
-            
+            }
+        ]
+        xlsxgraph = XLSXGraph(prepared_data)
+        result = xlsxgraph.insert_data()
+        self.assertEqual(xlsxgraph.start_col, 16)
 
 
 class TestXLSXSummary(unittest.TestCase):
     def test_xlsx_summary_init(self):
         spike_dict = {}
+        today = datetime.datetime.now().strftime("%Y-%m-%d")
         result = XLSXSummary(spike_dict)
+
         self.assertIsNotNone(result)
         self.assertIsNotNone(result.spike_dict)
         self.assertIsNotNone(result.wb)
         self.assertIsNotNone(result.ws)
-        self.assertEqual(result.file_name, "2026-05-25_spikes_summary")
-
-
-class TestXYAxesBounds(unittest.TestCase):
-    def test_xy_axes_bounds_init(self):
-        xy_axes_bounds = XYAxesBounds()
-        self.assertIsNotNone(xy_axes_bounds)
-        self.assertEqual(xy_axes_bounds.y_row_min, 0)
+        self.assertEqual(result.file_name, f"{today}_spikes_summary")
 
 
 class TestXLSXGraph(unittest.TestCase):
     def test_xlsxgraph_init(self):
-        data_to_graph = [
-            {
-                'unit': {
-                    "data": "prepared_temp_data",
-                    "xy_axes_bounds": "xy_axes_bounds",
-                    "data_width": "data_width",
-                }
+        data_to_graph = {
+            "unit": {
+                "data": "data_with_header",
+                "data_row_min": "data_row_min",
+                "data_row_max": "data_row_max",
+                "data_width": "data_width",
             }
-        ]
+        }
         today = datetime.datetime.now().strftime("%Y-%m-%d")
         result = XLSXGraph(data_to_graph)
         self.assertIsNotNone(result)
         self.assertEqual(result.start_col, 10)
-        self.assertEqual(result.file_name, f'{today}_usb_data_loggers_graph')
+        self.assertEqual(result.file_name, f"{today}_usb_loggers_graph")
+
 
 if __name__ == "__main__":
     unittest.main()

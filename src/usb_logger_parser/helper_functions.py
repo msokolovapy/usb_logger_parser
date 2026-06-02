@@ -132,7 +132,3 @@ def get_ave_data_coll_freq(df):
     return ave_data_coll_freq
 
 
-def parse_for_reporting_(unit):
-	data_row_min, data_row_max = ()
-	prepared_temp_data, data_width = ()
-	return data_row_min, data_row_max, prepared_temp_data, data_width
