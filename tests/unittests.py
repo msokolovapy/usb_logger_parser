@@ -122,13 +122,13 @@ class TestColdChainUnit(unittest.TestCase):
 
     def test_create_cc_unit(self):
         with (
-            patch(
-                "src.usb_logger_parser.helper_functions.pd.read_csv"
-            ) as mock_pandas_read,
-            patch(
-                "src.usb_logger_parser.helper_functions.validate_"
-            ) as mock_validate,
-            patch("src.usb_logger_parser.helper_functions.parse_") as mock_parse,
+            # patch(
+            #     "src.usb_logger_parser.helper_functions.pd.read_csv"
+            # ) as mock_pandas_read,
+            # patch(
+            #     "src.usb_logger_parser.helper_functions.validate_"
+            # ) as mock_validate,
+            # patch("src.usb_logger_parser.helper_functions.parse_") as mock_parse,
             patch(
                 "src.usb_logger_parser.storage_units.create_storage_condition_manually"
             ) as mock_manual_create,
@@ -139,14 +139,16 @@ class TestColdChainUnit(unittest.TestCase):
                 "src.usb_logger_parser.storage_units.get_average_temp"
             ) as mock_get_ave_temp,
             patch("src.usb_logger_parser.storage_units.read") as mock_read,
-            patch("src.usb_logger_parser.storage_units.get_ave_data_coll_freq") as mock_ave_data_coll_freq
+            patch(
+                "src.usb_logger_parser.storage_units.get_ave_data_coll_freq"
+            ) as mock_ave_data_coll_freq,
         ):
 
             file = "dummy.txt"
 
-            mock_pandas_read.return_value = "df"
-            mock_validate.return_value = "validated_dummy.txt"
-            mock_parse.return_value = ("parsed_df", 'logger_id', "serial_numb")
+            # mock_pandas_read.return_value = "df"
+            # mock_validate.return_value = "validated_dummy.txt"
+            # mock_parse.return_value = ("parsed_df", 'logger_id', "serial_numb")
             mock_read.return_value = (
                 self.df_temp_data,
                 self.logger_id,
@@ -172,7 +174,7 @@ class TestColdChainUnit(unittest.TestCase):
             self.assertEqual(fridge.logger.serial_numb, "00001")
             self.assertEqual(fridge.temp_data.shape, (20, 6))
             self.assertEqual(fridge.metadata, "ACPL234_ACPL01_09Apr2026")
-            self.fail('finish asserting mock calls and re-organizing mock order')
+            self.fail("finish asserting mock calls and re-organizing mock order")
 
 
 class TestHelperFunctions(unittest.TestCase):
@@ -197,7 +199,11 @@ class TestHelperFunctions(unittest.TestCase):
     def test_create_storage_condition_manually(self, mock_input):
         mock_input.side_effect = ["abracadabra", "FG"]
         storage_condit = create_storage_condition_manually(
-            self.df_temp_data, self.logger_id, self.serial_numb, self.ave_data_coll_freq,self.file_basename
+            self.df_temp_data,
+            self.logger_id,
+            self.serial_numb,
+            self.ave_data_coll_freq,
+            self.file_basename,
         )
         self.assertIsNotNone(storage_condit)
         self.assertEqual(storage_condit.high_alert, 15.0)
@@ -1023,20 +1029,77 @@ class TestReportingService(unittest.TestCase):
             }
         }
 
-        with patch.object(
-            ReportingService, "prepare_data_for_reporting_"
-        ) as mock_prepare_data:
+        with (
+            patch.object(
+                ReportingService, "prepare_data_for_reporting_"
+            ) as mock_prepare_data,
+            patch.object(XLSXGraph, "insert_data") as mock_insert_data,
+            patch.object(XLSXGraph, "insert_chart") as mock_insert_chart,
+        ):
             mock_prepare_data.return_value = sample_data
             storage_units = [self.unit]
             result = self.reporting_service.report_data_(storage_units)
             self.assertIsInstance(result, XLSXGraph)
             self.assertEqual(self.reporting_service.data_to_graph, [sample_data])
-            self.fail("finish testing update_axes_bounds!")
 
-    def test_insert_data(self):
-        self.fail("finish testing")
-        prepared_data = [
-            {
+    def test_extract_to_dict(self):
+        sample_df = self.unit.temp_data
+        result = self.reporting_service.extract_to_dict(sample_df)
+        expected_data = [
+            ["date_time", "celsius"],
+            ["2020-03-16 10:30:00", 0.0],
+            ["2020-03-16 10:40:00", 0.5],
+            ["2020-03-16 10:50:00", 1.0],
+            ["2020-03-16 11:00:00", 1.5],
+            ["2020-03-16 11:10:00", 2.0],
+        ]
+
+        expected_data_width = 2
+        self.assertEqual(result, (expected_data_width, expected_data))
+
+    def test_insert_metadata_header(self):
+        logger_metadata = ("ACP169 BU_FZ156", "052297777")
+        data_width = 2
+        data = [
+            ["date_time", "celsius"],
+            ["2020-03-16 10:30:00", 0.0],
+            ["2020-03-16 10:40:00", 0.5],
+            ["2020-03-16 10:50:00", 1.0],
+            ["2020-03-16 11:00:00", 1.5],
+            ["2020-03-16 11:10:00", 2.0],
+        ]
+        result = self.reporting_service.insert_metadata_header_(
+            data, data_width, logger_metadata
+        )
+        expected_data = [
+            ["ACP169 BU_FZ156", None],
+            ["052297777", None],
+            ["date_time", "celsius"],
+            ["2020-03-16 10:30:00", 0.0],
+            ["2020-03-16 10:40:00", 0.5],
+            ["2020-03-16 10:50:00", 1.0],
+            ["2020-03-16 11:00:00", 1.5],
+            ["2020-03-16 11:10:00", 2.0],
+        ]
+        expected_row_min = 4
+        expected_row_max = 8
+        self.assertEqual((expected_row_min, expected_row_max, expected_data), result)
+
+    def test_prepare_data_for_reporting_(self):
+        with (
+            patch.object(ReportingService, "extract_to_dict") as mock_extract_to_dict,
+            patch.object(
+                ReportingService, "insert_metadata_header_"
+            ) as mock_insert_metadata_header,
+        ):
+            mock_extract_to_dict.return_value = ("data", "data_width")
+            mock_insert_metadata_header.return_value = (
+                "data_row_min",
+                "data_row_max",
+                "data_with_header",
+            )
+            result = self.reporting_service.prepare_data_for_reporting_(self.unit)
+            expected_result = {
                 self.unit: {
                     "data": "data_with_header",
                     "data_row_min": "data_row_min",
@@ -1044,10 +1107,11 @@ class TestReportingService(unittest.TestCase):
                     "data_width": "data_width",
                 }
             }
-        ]
-        xlsxgraph = XLSXGraph(prepared_data)
-        result = xlsxgraph.insert_data()
-        self.assertEqual(xlsxgraph.start_col, 16)
+            mock_extract_to_dict.assert_called_with(self.unit.temp_data)
+            mock_insert_metadata_header.assert_called_with(
+                "data", (self.unit.logger.id, self.unit.logger.serial_numb)
+            )
+            self.assertEqual(result, expected_result)
 
 
 class TestXLSXSummary(unittest.TestCase):
@@ -1064,8 +1128,39 @@ class TestXLSXSummary(unittest.TestCase):
 
 
 class TestXLSXGraph(unittest.TestCase):
+    def setUp(self):
+        self.reporting_service = ReportingService()
+        df_temp_data = pd.DataFrame(
+            {
+                "date_time": [
+                    Timestamp("2020-03-16 10:30:00"),
+                    Timestamp("2020-03-16 10:40:00"),
+                    Timestamp("2020-03-16 10:50:00"),
+                    Timestamp("2020-03-16 11:00:00"),
+                    Timestamp("2020-03-16 11:10:00"),
+                ],
+                "celsius": [
+                    0.0,
+                    0.5,
+                    1.0,
+                    1.5,
+                    2.0,
+                ],
+            }
+        )
+        self.unit = Fridge(
+            df_temp_data,
+            logger_id="ACP169 BU_FZ156",
+            serial_numb="052297777",
+            ave_data_coll_freq=152.0,
+            file_basename="dummy.txt",
+        )
+
+    def tearDown(self):
+        pass
+
     def test_xlsxgraph_init(self):
-        data_to_graph = {
+        data = {
             "unit": {
                 "data": "data_with_header",
                 "data_row_min": "data_row_min",
@@ -1074,10 +1169,50 @@ class TestXLSXGraph(unittest.TestCase):
             }
         }
         today = datetime.datetime.now().strftime("%Y-%m-%d")
-        result = XLSXGraph(data_to_graph)
+        result = XLSXGraph(data)
         self.assertIsNotNone(result)
         self.assertEqual(result.start_col, 10)
         self.assertEqual(result.file_name, f"{today}_usb_loggers_graph")
+        self.assertEqual(
+            result.x_axis_bounds,
+            {"col_min": 0, "col_max": 0, "row_min": 0, "row_max": 0},
+        )
+        self.assertIsInstance(result.wb, Workbook)
+        self.assertIsNotNone(result.ws)
+
+    def test_insert_data(self):
+        data = [
+            {
+                self.unit: {
+                    "data": [
+                        ["ACP169 BU_FZ156", None],
+                        ["052297777", None],
+                        ["date_time", "celsius"],
+                        ["2020-03-16 10:30:00", 0.0],
+                        ["2020-03-16 10:40:00", 0.5],
+                        ["2020-03-16 10:50:00", 1.0],
+                        ["2020-03-16 11:00:00", 1.5],
+                        ["2020-03-16 11:10:00", 2.0],
+                    ],
+                    "data_row_min": 4,
+                    "data_row_max": 8,
+                    "data_width": 2,
+                }
+            }
+        ]
+        xlsxgraph = XLSXGraph(data)
+        xlsxgraph.insert_data()
+        self.assertEqual(
+            xlsxgraph.x_axis_bounds,
+            {"col_min": 10, "col_max": 0, "row_min": 4, "row_max": 8},
+        )
+        data, = xlsxgraph.data_to_graph
+        self.assertEqual(
+            data[self.unit]["y_axis_bounds"],
+            {"col_min": 12, "col_max": 0, "row_min": 4, "row_max": 8},
+        )
+        self.assertEqual(xlsxgraph.start_col, 13)
+        xlsxgraph.wb.close()
 
 
 if __name__ == "__main__":
