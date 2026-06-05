@@ -33,8 +33,8 @@ class ReportingService:
         df["date_time"] = df["date_time"].astype(str)
         values = df.values.tolist()
         column_names = df.columns.tolist() # to obtain data as a list of lists for easy writing to xlsx workbook later
-        data = values.insert(0, column_names)
-        return data, data_width
+        values.insert(0, column_names)
+        return values, data_width
 
     def insert_metadata_header_(self, data, data_width, logger_metadata):
         data_row_min = 1  # row 0 is already taken by column names

@@ -4,6 +4,7 @@ from unittest.mock import Mock, MagicMock
 from unittest.mock import patch
 import pandas as pd
 from pandas import Timestamp
+from xlsxwriter import Workbook
 import logging
 from src.usb_logger_parser.helper_functions import (
     read,
@@ -122,13 +123,6 @@ class TestColdChainUnit(unittest.TestCase):
 
     def test_create_cc_unit(self):
         with (
-            # patch(
-            #     "src.usb_logger_parser.helper_functions.pd.read_csv"
-            # ) as mock_pandas_read,
-            # patch(
-            #     "src.usb_logger_parser.helper_functions.validate_"
-            # ) as mock_validate,
-            # patch("src.usb_logger_parser.helper_functions.parse_") as mock_parse,
             patch(
                 "src.usb_logger_parser.storage_units.create_storage_condition_manually"
             ) as mock_manual_create,
@@ -146,9 +140,6 @@ class TestColdChainUnit(unittest.TestCase):
 
             file = "dummy.txt"
 
-            # mock_pandas_read.return_value = "df"
-            # mock_validate.return_value = "validated_dummy.txt"
-            # mock_parse.return_value = ("parsed_df", 'logger_id', "serial_numb")
             mock_read.return_value = (
                 self.df_temp_data,
                 self.logger_id,
@@ -156,6 +147,7 @@ class TestColdChainUnit(unittest.TestCase):
                 self.file_basename,
             )
             mock_get_ave_temp.return_value = 5.0
+            mock_ave_data_coll_freq.return_value = 152.0
             mock_user_confirmation.side_effect = ["abracadabra", "FG"]
             mock_manual_create.return_value = Fridge(
                 self.df_temp_data,
@@ -166,6 +158,13 @@ class TestColdChainUnit(unittest.TestCase):
             )
 
             fridge = StorageCondition.create_from_(file)
+
+            mock_read.assert_called_with(file)
+            mock_get_ave_temp.assert_called()
+            mock_ave_data_coll_freq.assert_called()
+            mock_user_confirmation.assert_called()
+            mock_manual_create.assert_called()
+
             self.assertIsNotNone(fridge)
             self.assertEqual(fridge.low_alarm, 2.0)
             self.assertEqual(fridge.high_alarm, 8.0)
@@ -174,7 +173,6 @@ class TestColdChainUnit(unittest.TestCase):
             self.assertEqual(fridge.logger.serial_numb, "00001")
             self.assertEqual(fridge.temp_data.shape, (20, 6))
             self.assertEqual(fridge.metadata, "ACPL234_ACPL01_09Apr2026")
-            self.fail("finish asserting mock calls and re-organizing mock order")
 
 
 class TestHelperFunctions(unittest.TestCase):
@@ -213,6 +211,9 @@ class TestHelperFunctions(unittest.TestCase):
         average_temp = get_average_temp(df)
         self.assertEqual(average_temp, -24.5)
 
+    def test_parse_(self):
+        self.fail("finish testing")
+
     @patch("os.path.basename")
     @patch(f"{__name__}.validate_")
     @patch(f"{__name__}.pd.read_csv")
@@ -220,7 +221,13 @@ class TestHelperFunctions(unittest.TestCase):
         mock_valid_data.return_value = "dummy.txt"
         mock_read_csv.return_value = pd.DataFrame(self.df_temp_data)
         mock_basename.return_value = self.file_basename
-        expected_column_names = ["date_time", "celsius", "high_alarm", "low_alarm"]
+        expected_column_names = [
+            "row_numb",
+            "date_time",
+            "celsius",
+            "high_alarm",
+            "low_alarm",
+        ]
 
         df_temp_data, logger_id, serial_numb, file_basename = read("dummy.txt")
 
@@ -992,6 +999,7 @@ class TestReportingService(unittest.TestCase):
         self.reporting_service = ReportingService()
         df_temp_data = pd.DataFrame(
             {
+                "row_numb": [1, 2, 3, 4, 5],
                 "date_time": [
                     Timestamp("2020-03-16 10:30:00"),
                     Timestamp("2020-03-16 10:40:00"),
@@ -1038,51 +1046,55 @@ class TestReportingService(unittest.TestCase):
         ):
             mock_prepare_data.return_value = sample_data
             storage_units = [self.unit]
+
             result = self.reporting_service.report_data_(storage_units)
-            self.assertIsInstance(result, XLSXGraph)
+
+            mock_prepare_data.assert_called_with(self.unit)
+            mock_insert_data.assert_called()
+            mock_insert_chart.assert_called()
             self.assertEqual(self.reporting_service.data_to_graph, [sample_data])
 
     def test_extract_to_dict(self):
         sample_df = self.unit.temp_data
         result = self.reporting_service.extract_to_dict(sample_df)
         expected_data = [
-            ["date_time", "celsius"],
-            ["2020-03-16 10:30:00", 0.0],
-            ["2020-03-16 10:40:00", 0.5],
-            ["2020-03-16 10:50:00", 1.0],
-            ["2020-03-16 11:00:00", 1.5],
-            ["2020-03-16 11:10:00", 2.0],
+            ["row_numb", "date_time", "celsius"],
+            [1, "2020-03-16 10:30:00", 0.0],
+            [2, "2020-03-16 10:40:00", 0.5],
+            [3, "2020-03-16 10:50:00", 1.0],
+            [4, "2020-03-16 11:00:00", 1.5],
+            [5, "2020-03-16 11:10:00", 2.0],
         ]
 
-        expected_data_width = 2
-        self.assertEqual(result, (expected_data_width, expected_data))
+        expected_data_width = 3
+        self.assertEqual(result, (expected_data, expected_data_width))
 
     def test_insert_metadata_header(self):
         logger_metadata = ("ACP169 BU_FZ156", "052297777")
-        data_width = 2
+        data_width = 3
         data = [
-            ["date_time", "celsius"],
-            ["2020-03-16 10:30:00", 0.0],
-            ["2020-03-16 10:40:00", 0.5],
-            ["2020-03-16 10:50:00", 1.0],
-            ["2020-03-16 11:00:00", 1.5],
-            ["2020-03-16 11:10:00", 2.0],
+            ["row_numb", "date_time", "celsius"],
+            [1, "2020-03-16 10:30:00", 0.0],
+            [2, "2020-03-16 10:40:00", 0.5],
+            [3, "2020-03-16 10:50:00", 1.0],
+            [4, "2020-03-16 11:00:00", 1.5],
+            [5, "2020-03-16 11:10:00", 2.0],
         ]
         result = self.reporting_service.insert_metadata_header_(
             data, data_width, logger_metadata
         )
         expected_data = [
-            ["ACP169 BU_FZ156", None],
-            ["052297777", None],
-            ["date_time", "celsius"],
-            ["2020-03-16 10:30:00", 0.0],
-            ["2020-03-16 10:40:00", 0.5],
-            ["2020-03-16 10:50:00", 1.0],
-            ["2020-03-16 11:00:00", 1.5],
-            ["2020-03-16 11:10:00", 2.0],
+            ["052297777", None, None],
+            ["ACP169 BU_FZ156", None, None],
+            ["row_numb", "date_time", "celsius"],
+            [1, "2020-03-16 10:30:00", 0.0],
+            [2, "2020-03-16 10:40:00", 0.5],
+            [3, "2020-03-16 10:50:00", 1.0],
+            [4, "2020-03-16 11:00:00", 1.5],
+            [5, "2020-03-16 11:10:00", 2.0],
         ]
-        expected_row_min = 4
-        expected_row_max = 8
+        expected_row_min = 3
+        expected_row_max = 7
         self.assertEqual((expected_row_min, expected_row_max, expected_data), result)
 
     def test_prepare_data_for_reporting_(self):
@@ -1109,7 +1121,9 @@ class TestReportingService(unittest.TestCase):
             }
             mock_extract_to_dict.assert_called_with(self.unit.temp_data)
             mock_insert_metadata_header.assert_called_with(
-                "data", (self.unit.logger.id, self.unit.logger.serial_numb)
+                "data",
+                "data_width",
+                (self.unit.logger.id, self.unit.logger.serial_numb),
             )
             self.assertEqual(result, expected_result)
 
@@ -1132,6 +1146,7 @@ class TestXLSXGraph(unittest.TestCase):
         self.reporting_service = ReportingService()
         df_temp_data = pd.DataFrame(
             {
+                "row_numb": [1, 2, 3, 4, 5],
                 "date_time": [
                     Timestamp("2020-03-16 10:30:00"),
                     Timestamp("2020-03-16 10:40:00"),
@@ -1185,17 +1200,17 @@ class TestXLSXGraph(unittest.TestCase):
             {
                 self.unit: {
                     "data": [
-                        ["ACP169 BU_FZ156", None],
-                        ["052297777", None],
-                        ["date_time", "celsius"],
-                        ["2020-03-16 10:30:00", 0.0],
-                        ["2020-03-16 10:40:00", 0.5],
-                        ["2020-03-16 10:50:00", 1.0],
-                        ["2020-03-16 11:00:00", 1.5],
-                        ["2020-03-16 11:10:00", 2.0],
+                        ["052297777", None, None],
+                        ["ACP169 BU_FZ156", None, None],
+                        ["row_numb", "date_time", "celsius"],
+                        [1, "2020-03-16 10:30:00", 0.0],
+                        [2, "2020-03-16 10:40:00", 0.5],
+                        [3, "2020-03-16 10:50:00", 1.0],
+                        [4, "2020-03-16 11:00:00", 1.5],
+                        [5, "2020-03-16 11:10:00", 2.0],
                     ],
-                    "data_row_min": 4,
-                    "data_row_max": 8,
+                    "data_row_min": 3,
+                    "data_row_max": 7,
                     "data_width": 2,
                 }
             }
@@ -1204,14 +1219,14 @@ class TestXLSXGraph(unittest.TestCase):
         xlsxgraph.insert_data()
         self.assertEqual(
             xlsxgraph.x_axis_bounds,
-            {"col_min": 10, "col_max": 0, "row_min": 4, "row_max": 8},
+            {"col_min": 10, "col_max": 0, "row_min": 3, "row_max": 7},
         )
-        data, = xlsxgraph.data_to_graph
+        (data,) = xlsxgraph.data_to_graph
         self.assertEqual(
             data[self.unit]["y_axis_bounds"],
-            {"col_min": 12, "col_max": 0, "row_min": 4, "row_max": 8},
+            {"col_min": 14, "col_max": 0, "row_min": 3, "row_max": 7},
         )
-        self.assertEqual(xlsxgraph.start_col, 13)
+        self.assertEqual(xlsxgraph.start_col, 14)
         xlsxgraph.wb.close()
 
 

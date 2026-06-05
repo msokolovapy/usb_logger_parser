@@ -43,7 +43,8 @@ def parse_(df):
     )
     logger_id = df.columns.values[0]
     serial_numb = df["serial_number"][0]
-    df.drop(columns=[logger_id, "serial_number"], inplace=True)
+    df = df.rename(columns={logger_id: 'row_numb'})
+    df.drop(columns=["serial_number"], inplace=True)
     return df, logger_id, serial_numb
 
 
