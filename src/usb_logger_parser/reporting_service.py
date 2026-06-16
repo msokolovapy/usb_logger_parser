@@ -1,7 +1,9 @@
 from xlsxwriter import Workbook
 import logging
-from datetime import datetime
+import pandas as pd
+from datetime import datetime, date
 from src.usb_logger_parser.helper_functions import data_collection_frequency_check
+
 
 logger = logging.getLogger(__name__)
 
@@ -10,8 +12,8 @@ class ReportingService:
     def __init__(self):
         self.data_to_graph = []
 
-    def report_spike_dict_(self, spike_dicts):
-        return XlSXSummary(spike_dict)
+    def report_spike_dict_(self, spike_info_list):
+        return XlSXSummary(spike_info_list)
 
     def report_data_(self, storage_units):
         for unit in storage_units:
@@ -30,10 +32,11 @@ class ReportingService:
 
     def extract_to_dict(self, df):
         data_width = df.shape[1]
-        df["date_time"] = df["date_time"].astype(str)
+        df["date_time"] = pd.to_datetime(df["date_time"]).dt.to_pydatetime()
         values = df.values.tolist()
         column_names = df.columns.tolist() # to obtain data as a list of lists for easy writing to xlsx workbook later
         values.insert(0, column_names)
+        values = tuple([tuple(value) for value in values]) #to make tuple of tuples for immutability
         return values, data_width
 
     def insert_metadata_header_(self, data, data_width, logger_metadata):
@@ -63,19 +66,33 @@ class ReportingService:
 
 
 class XLSXSummary:
-    def __init__(self, spike_dict):
-        self.spike_dict = spike_dict
+    def __init__(self, spikes_list):
+        self.spikes_list = spikes_list
         self.file_name = self.get_file_name()
         self.wb = Workbook(f"{self.file_name}.xlsx")
-        self.ws = self.wb.add_worksheet(self.file_name)
+        self.ws = self.wb.add_worksheet(self.file_name) # keeping worksheet as attribute as xlsxwriter cannot re-open worksheets
+        self.datetime_format = self.wb.add_format({'num_format': 'dd/mm/yyyy hh:mm:ss'}) #essential for xlxswriter to save dates as native Excel format
+        self.date_format = self.wb.add_format({'num_format': 'dd/mm/yyyy'}) #same as above
 
     def get_file_name(self):
         formatted_today = datetime.now().strftime("%Y-%m-%d")
         return f"{formatted_today}_spikes_summary"
 
-    def insert_data(spike_dict):
-        pass
-
+    def insert_data(self):
+        current_row = 0
+        for spike_tuple in self.spikes_list:
+            for spike_details in spike_tuple:
+                for col_idx, value in enumerate(spike_details):
+                    if isinstance(value, datetime):
+                        self.ws.write(current_row, col_idx, value, self.datetime_format)
+                    elif isinstance(value, date):
+                        self.ws.write(current_row, col_idx, value, self.date_format)
+                    else:
+                        self.ws.write(current_row, col_idx, value)
+                current_row += 1
+            self.ws.write_row(current_row, 0, (None,)*1) # for ease of reading - insert blank row between spike info from different usb loggers
+            current_row += 1
+        self.wb.close()
 
 class XLSXGraph:
     def __init__(self, data_to_graph):
@@ -90,8 +107,9 @@ class XLSXGraph:
         self.file_name = self.get_file_name()
         self.wb = Workbook(f"{self.file_name}.xlsx")
         self.ws = (
-            self.wb.add_worksheet()
+            self.wb.add_worksheet(f'{self.file_name}')
         )  # keeping worksheet as attribute as xlsxwriter cannot re-open worksheets
+        self.datetime_format = self.wb.add_format({'num_format': 'dd/mm/yyyy hh:mm:ss'}) #essential for xlxswriter to save dates as native Excel format
 
     def get_file_name(self):
         formatted_today = datetime.now().strftime("%Y-%m-%d")
@@ -111,7 +129,7 @@ class XLSXGraph:
 
                 y_axis_bounds = {
                     "col_min": self.start_col + 2,
-                    "col_max": 0,
+                    "col_max": self.start_col + 2,
                     "row_min": data_row_min,
                     "row_max": data_row_max,
                 }
@@ -122,9 +140,12 @@ class XLSXGraph:
                     self.x_axis_bounds["row_max"] = data_row_max
                     self.x_axis_bounds["row_min"] = data_row_min
                     self.x_axis_bounds["col_min"] = self.start_col
+                    self.x_axis_bounds["col_max"] = self.start_col
 
                 for row_idx, data_row in enumerate(temp_data):
                     for column_idx, data_column in enumerate(data_row):
+                        if isinstance(data_column, datetime):
+                            self.ws.write(row_idx, self.start_col + column_idx, data_column, self.datetime_format)
                         self.ws.write(row_idx, self.start_col + column_idx, data_column)
 
                 self.start_col = self.start_col + data_width + 1
@@ -133,30 +154,31 @@ class XLSXGraph:
     def insert_chart(self):
         chart = self.wb.add_chart({"type": "scatter", "subtype": "smooth"})
         chart.set_title({"name": "Temperature Data"})
-        chart.set_x_axis({"name": "Row", "position": "bottom"})
+        chart.set_x_axis({"name": "Row Number", "position": "bottom"})
         chart.set_y_axis({"name": "Temperature (°C)", "crossing": "min"})
         chart.set_legend({"position": "right"})
 
-        for unit, data in self.data_to_graph.items():
-            y_axis_bounds = data["y_axis_bounds"]
-            chart.add_series(
-                {
-                    "name": unit.logger.id,
-                    "categories": [
-                        self.file_name,
-                        self.x_axis_bounds["row_min"],
-                        self.x_axis_bounds["col_min"],
-                        self.x_axis_bounds["row_max"],
-                        self.x_axis_bounds["col_max"],
-                    ],
-                    "values": [
-                        self.file_name,
-                        y_axis_bounds["row_min"],
-                        y_axis_bounds["col_min"],
-                        y_axis_bounds["row_max"],
-                        y_axis_bounds["col_max"],
-                    ],
-                }
-            )
+        for data in self.data_to_graph:
+            for unit, data in data.items():
+                y_axis_bounds = data["y_axis_bounds"]
+                chart.add_series(
+                    {
+                        "name": unit.logger.id,
+                        "categories": [
+                            self.file_name,
+                            self.x_axis_bounds["row_min"],
+                            self.x_axis_bounds["col_min"],
+                            self.x_axis_bounds["row_max"],
+                            self.x_axis_bounds["col_max"],
+                        ],
+                        "values": [
+                            self.file_name,
+                            y_axis_bounds["row_min"],
+                            y_axis_bounds["col_min"],
+                            y_axis_bounds["row_max"],
+                            y_axis_bounds["col_max"],
+                        ],
+                    }
+                )
         self.ws.insert_chart("A1", chart)
         self.wb.close()

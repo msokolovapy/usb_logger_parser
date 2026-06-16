@@ -29,11 +29,11 @@ class AnalyticalService:
             df = self.check_against_limits(
                 df, unit.spike_duration, unit.total_spikes_duration
             )
-            spike_dict = self.find_mkt(df, unit.temp_data)
-            spike_dict = self.annotate_spike_dict_with_metadata(
-                spike_dict, unit.logger.id, unit.logger.serial_numb, unit.metadata
+            df = self.find_mkt(df, unit.temp_data)
+            spike_info = self.prepare_df_for_reporting(
+                df, unit.logger.id, unit.logger.serial_numb, unit.metadata
             )
-            spike_dict_list.append(spike_dict)
+            spike_dict_list.append(spike_info)
         return spike_dict_list
 
     def add_status_column(self, df, low_alarm, high_alarm):
@@ -121,7 +121,7 @@ class AnalyticalService:
             .groupby("cumulat_spike_id")
             .agg(
                 extreme_temp=("celsius", lambda x: get_extreme_temp(x)),
-                spike_date=("date_time", lambda x: x.dt.floor('D').min()),
+                spike_date=("date_time", lambda x: x.dt.floor("D").min()),
                 extreme_date_time=("date_time", lambda x: get_extreme_date_time(x, df)),
                 spike_duration_mins=("date_time", lambda x: get_spike_duration(x)),
             )
@@ -157,9 +157,16 @@ class AnalyticalService:
         df_excursions["mkt"] = df_excursions.apply(
             self.calculate_mkt_24hr_window, df=original_df, axis=1
         )
-        # converti Timestamp to datetime object and pack everything into a list of dictionaries
-        df_excursions = convert_timestamps(df_excursions)
-        return df_excursions.to_dict("records")
+        return df_excursions
+
+    def prepare_df_for_reporting(self, df):
+        df = convert_timestamps(df)
+        column_names = df.columns.tolist()
+        values = df.values.tolist()
+        values.insert(0, column_names)
+        return tuple(
+            [tuple(value) for value in values]
+        )  # returns tuple of tuples of headers and all values row by row
 
     def calculate_mkt_24hr_window(self, row, df):
         window_start = row["extreme_date_time"] - timedelta(hours=12)
@@ -188,12 +195,14 @@ class AnalyticalService:
         mkt = round(mkt, 1)
         return mkt
 
-    def annotate_spike_dict_with_metadata(
-        self, spike_dict_list, logger_id, logger_serial_number, file_name
-    ):
-        spike_dict_annotated = {}
-        spike_dict_annotated["spikes"] = spike_dict_list
-        spike_dict_annotated["logger_id"] = logger_id
-        spike_dict_annotated["logger_serial_number"] = logger_serial_number
-        spike_dict_annotated["file_name"] = file_name
-        return spike_dict_annotated
+    def prepare_df_for_reporting(self, df, logger_id, logger_serial_number, file_name):
+        df = convert_timestamps(df)
+        column_names = df.columns.tolist()
+        values = df.values.tolist()
+        values.insert(0, column_names)
+        values.insert(0, ["usb_logger_id", logger_id])
+        values.insert(0, ["usb_serial_number", logger_serial_number])
+        values.insert(0, ["file_name", file_name])
+        return tuple(
+            [tuple(value) for value in values]
+        )  # returns tuple of tuples of headers and all values row by row

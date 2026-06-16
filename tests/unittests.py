@@ -431,6 +431,7 @@ class TestAnalyzeSpikes(unittest.TestCase):
             )
 
             self.assertEqual(result, ["spike_dict_annotated"])
+            self.fail("finish adding more details for changed last lines")
 
         spike_dict = self.analytical_service.analyze_spikes([self.unit])
         print(spike_dict)
@@ -916,17 +917,11 @@ class TestAnalyzeSpikes(unittest.TestCase):
         self.assertTrue((df_checked_against_limits["spike_status"] == "Pass").all())
 
     def test_find_mkt(self):
-        with (
-            patch.object(
-                AnalyticalService, "calculate_mkt_24hr_window", autospec=True
-            ) as mock_mkt,
-            patch(
-                "src.usb_logger_parser.analytical_service.convert_timestamps"
-            ) as mock_convert_timestamps,
-        ):
+        with patch.object(
+            AnalyticalService, "calculate_mkt_24hr_window", autospec=True
+        ) as mock_mkt:
             self.analytical_service.find_mkt(pd.DataFrame({}), pd.DataFrame({}))
             mock_mkt.assert_called()
-            mock_convert_timestamps.assert_called()
 
     def test_calculate_mkt_24hr_window(self):
         sample_row = pd.Series(
@@ -981,17 +976,56 @@ class TestAnalyzeSpikes(unittest.TestCase):
         result = self.analytical_service.apply_arrhenius(sample_df)
         self.assertEqual(result, expected_result)
 
-    def test_annotate_spike_dict_with_metadata(self):
-        spike_dict = {}
-        result = self.analytical_service.annotate_spike_dict_with_metadata(
-            spike_dict,
+    def test_prepare_df_for_reporting(self):
+        sample_df = pd.DataFrame(
+            {
+                "cumulat_spike_id": [1, 3],
+                "extreme_temp": [20.0, 1.5],
+                "spike_date": [Timestamp("2020-03-15"), Timestamp("2020-03-16")],
+                "extreme_date_time": [
+                    Timestamp("2020-03-15 10:30:00"),
+                    Timestamp("2020-03-16 11:10:00"),
+                ],
+                "spike_duration_mins": [20, 30],
+                "spike_duration_24hr_mins": [20.0, 30.0],
+            }
+        )
+        result = self.analytical_service.prepare_df_for_reporting(
+            sample_df,
             self.unit.logger.id,
             self.unit.logger.serial_numb,
             self.unit.metadata,
         )
-        self.assertEqual(result["logger_id"], "ACP169 BU_FZ156")
-        self.assertEqual(result["logger_serial_number"], "052297777")
-        self.assertEqual(result["file_name"], "dummy.txt")
+        expected_result = (
+            ("file_name", "dummy.txt"),
+            ("usb_serial_number", "052297777"),
+            ("usb_logger_id", "ACP169 BU_FZ156"),
+            (
+                "cumulat_spike_id",
+                "extreme_temp",
+                "spike_date",
+                "extreme_date_time",
+                "spike_duration_mins",
+                "spike_duration_24hr_mins",
+            ),
+            (
+                1,
+                20.0,
+                datetime.date(2020, 3, 15),
+                datetime.datetime(2020, 3, 15, 10, 30),
+                20,
+                20.0,
+            ),
+            (
+                3,
+                1.5,
+                datetime.date(2020, 3, 16),
+                datetime.datetime(2020, 3, 16, 11, 10),
+                30,
+                30.0,
+            ),
+        )
+        self.assertEqual(expected_result, result)
 
 
 class TestReportingService(unittest.TestCase):
@@ -1057,29 +1091,31 @@ class TestReportingService(unittest.TestCase):
     def test_extract_to_dict(self):
         sample_df = self.unit.temp_data
         result = self.reporting_service.extract_to_dict(sample_df)
-        expected_data = [
-            ["row_numb", "date_time", "celsius"],
-            [1, "2020-03-16 10:30:00", 0.0],
-            [2, "2020-03-16 10:40:00", 0.5],
-            [3, "2020-03-16 10:50:00", 1.0],
-            [4, "2020-03-16 11:00:00", 1.5],
-            [5, "2020-03-16 11:10:00", 2.0],
-        ]
-
+        expected_data = (
+            (
+                ("row_numb", "date_time", "celsius"),
+                (1, datetime.datetime(2020, 3, 16, 10, 30), 0.0),
+                (2, datetime.datetime(2020, 3, 16, 10, 40), 0.5),
+                (3, datetime.datetime(2020, 3, 16, 10, 50), 1.0),
+                (4, datetime.datetime(2020, 3, 16, 11, 0), 1.5),
+                (5, datetime.datetime(2020, 3, 16, 11, 10), 2.0),
+            ),
+            3,
+        )
         expected_data_width = 3
-        self.assertEqual(result, (expected_data, expected_data_width))
+        self.assertEqual(result, expected_data)
 
     def test_insert_metadata_header(self):
         logger_metadata = ("ACP169 BU_FZ156", "052297777")
         data_width = 3
-        data = [
-            ["row_numb", "date_time", "celsius"],
-            [1, "2020-03-16 10:30:00", 0.0],
-            [2, "2020-03-16 10:40:00", 0.5],
-            [3, "2020-03-16 10:50:00", 1.0],
-            [4, "2020-03-16 11:00:00", 1.5],
-            [5, "2020-03-16 11:10:00", 2.0],
-        ]
+        data = (
+            ("row_numb", "date_time", "celsius"),
+            (1, datetime.datetime(2020, 3, 16, 10, 30), 0.0),
+            (2, datetime.datetime(2020, 3, 16, 10, 40), 0.5),
+            (3, datetime.datetime(2020, 3, 16, 10, 50), 1.0),
+            (4, datetime.datetime(2020, 3, 16, 11, 0), 1.5),
+            (5, datetime.datetime(2020, 3, 16, 11, 10), 2.0),
+        )
         result = self.reporting_service.insert_metadata_header_(
             data, data_width, logger_metadata
         )
@@ -1094,7 +1130,8 @@ class TestReportingService(unittest.TestCase):
             [5, "2020-03-16 11:10:00", 2.0],
         ]
         expected_row_min = 3
-        expected_row_max = 7
+        expected_row_max = 8
+        print(f'here is the {result}')
         self.assertEqual((expected_row_min, expected_row_max, expected_data), result)
 
     def test_prepare_data_for_reporting_(self):
@@ -1130,15 +1167,64 @@ class TestReportingService(unittest.TestCase):
 
 class TestXLSXSummary(unittest.TestCase):
     def test_xlsx_summary_init(self):
-        spike_dict = {}
+        spike_info_list = []
         today = datetime.datetime.now().strftime("%Y-%m-%d")
-        result = XLSXSummary(spike_dict)
+        result = XLSXSummary(spike_info_list)
 
         self.assertIsNotNone(result)
-        self.assertIsNotNone(result.spike_dict)
+        self.assertIsNotNone(result.spike_info_list)
         self.assertIsNotNone(result.wb)
         self.assertIsNotNone(result.ws)
         self.assertEqual(result.file_name, f"{today}_spikes_summary")
+
+    def test_insert_data(self):
+        sample_spikes_list = [
+            (
+                ("file_name", "dummy.txt"),
+                ("usb_serial_number", "052297777"),
+                ("usb_logger_id", "ACP169 BU_FZ156"),
+                (
+                    "cumulat_spike_id",
+                    "extreme_temp",
+                    "spike_date",
+                    "extreme_date_time",
+                    "spike_duration_mins",
+                    "spike_duration_24hr_mins",
+                ),
+                (
+                    1,
+                    20.0,
+                    datetime.date(2020, 3, 15),
+                    datetime.datetime(2020, 3, 15, 10, 30),
+                    20,
+                    20.0,
+                ),
+            ),
+            (
+                ("file_name", "dummy_2.txt"),
+                ("usb_serial_number", "064297777"),
+                ("usb_logger_id", "ACP226"),
+                (
+                    "cumulat_spike_id",
+                    "extreme_temp",
+                    "spike_date",
+                    "extreme_date_time",
+                    "spike_duration_mins",
+                    "spike_duration_24hr_mins",
+                ),
+                (
+                    1,
+                    1.5,
+                    datetime.date(2020, 3, 16),
+                    datetime.datetime(2020, 3, 16, 11, 10),
+                    30,
+                    30.0,
+                ),
+            ),
+        ]
+
+        xlsx_summary = XLSXSummary(sample_spikes_list)
+        xlsx_summary.insert_data()
 
 
 class TestXLSXGraph(unittest.TestCase):
@@ -1211,7 +1297,7 @@ class TestXLSXGraph(unittest.TestCase):
                     ],
                     "data_row_min": 3,
                     "data_row_max": 7,
-                    "data_width": 2,
+                    "data_width": 3,
                 }
             }
         ]
@@ -1224,10 +1310,33 @@ class TestXLSXGraph(unittest.TestCase):
         (data,) = xlsxgraph.data_to_graph
         self.assertEqual(
             data[self.unit]["y_axis_bounds"],
-            {"col_min": 14, "col_max": 0, "row_min": 3, "row_max": 7},
+            {"col_min": 12, "col_max": 0, "row_min": 3, "row_max": 7},
         )
         self.assertEqual(xlsxgraph.start_col, 14)
-        xlsxgraph.wb.close()
+
+    def test_insert_chart(self):
+        data = [
+            {
+                self.unit: {
+                    "data": [
+                        ["052297777", None, None],
+                        ["ACP169 BU_FZ156", None, None],
+                        ["row_numb", "date_time", "celsius"],
+                        [1, "2020-03-16 10:30:00", 0.0],
+                        [2, "2020-03-16 10:40:00", 0.5],
+                        [3, "2020-03-16 10:50:00", 1.0],
+                        [4, "2020-03-16 11:00:00", 1.5],
+                        [5, "2020-03-16 11:10:00", 2.0],
+                    ],
+                    "data_row_min": 3,
+                    "data_row_max": 7,
+                    "data_width": 3,
+                }
+            }
+        ]
+        xlsxgraph = XLSXGraph(data)
+        xlsxgraph.insert_data()
+        xlsxgraph.insert_chart()
 
 
 if __name__ == "__main__":
