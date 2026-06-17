@@ -4,7 +4,6 @@ import pandas as pd
 from datetime import datetime, date
 from src.usb_logger_parser.helper_functions import data_collection_frequency_check
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -17,7 +16,9 @@ class ReportingService:
         data_width = unit.temp_data.shape[1]
 
         data_with_header = insert_metadata_header(data, unit.metadata)
-        data_row_min = len(unit.metadata) + 2 #to account for column fields already present in data
+        data_row_min = (
+            len(unit.metadata) + 2
+        )  # to account for column fields already present in data
         data_row_max = len(data_with_header)
         return {
             unit: {
@@ -27,7 +28,6 @@ class ReportingService:
                 "data_width": data_width,
             }
         }
-
 
     def report_spikes(self, spike_info_list):
         return XlSXSummary(spike_info_list)
@@ -47,8 +47,6 @@ class ReportingService:
         xlsxgraph.insert_data()
         xlsxgraph.insert_chart()
 
-
-
     # def extract_to_dict(self, df):
     #     data_width = df.shape[1]
     #     df["date_time"] = pd.to_datetime(df["date_time"]).dt.to_pydatetime()
@@ -66,7 +64,6 @@ class ReportingService:
     #         data_row_min += 1
     #     data_row_max = len(data)
     #     return data_row_min, data_row_max, data
-
 
     # def prepare_data_for_reporting_(self, unit):
     #     data, data_width = self.extract_to_dict(unit.temp_data)
@@ -89,9 +86,15 @@ class XLSXSummary:
         self.spikes_list = spikes_list
         self.file_name = self.get_file_name()
         self.wb = Workbook(f"{self.file_name}.xlsx")
-        self.ws = self.wb.add_worksheet(self.file_name) # keeping worksheet as attribute as xlsxwriter cannot re-open worksheets
-        self.datetime_format = self.wb.add_format({'num_format': 'dd/mm/yyyy hh:mm:ss'}) #essential for xlxswriter to save dates as native Excel format
-        self.date_format = self.wb.add_format({'num_format': 'dd/mm/yyyy'}) #same as above
+        self.ws = self.wb.add_worksheet(
+            self.file_name
+        )  # keeping worksheet as attribute as xlsxwriter cannot re-open worksheets
+        self.datetime_format = self.wb.add_format(
+            {"num_format": "dd/mm/yyyy hh:mm:ss"}
+        )  # essential for xlxswriter to save dates as native Excel format
+        self.date_format = self.wb.add_format(
+            {"num_format": "dd/mm/yyyy"}
+        )  # same as above
 
     def get_file_name(self):
         formatted_today = datetime.now().strftime("%Y-%m-%d")
@@ -109,9 +112,12 @@ class XLSXSummary:
                     else:
                         self.ws.write(current_row, col_idx, value)
                 current_row += 1
-            self.ws.write_row(current_row, 0, (None,)*1) # for ease of reading - insert blank row between spike info from different usb loggers
+            self.ws.write_row(
+                current_row, 0, (None,) * 1
+            )  # for ease of reading - insert blank row between spike info from different usb loggers
             current_row += 1
         self.wb.close()
+
 
 class XLSXGraph:
     def __init__(self, data_to_graph):
@@ -125,10 +131,12 @@ class XLSXGraph:
         }
         self.file_name = self.get_file_name()
         self.wb = Workbook(f"{self.file_name}.xlsx")
-        self.ws = (
-            self.wb.add_worksheet(f'{self.file_name}')
+        self.ws = self.wb.add_worksheet(
+            f"{self.file_name}"
         )  # keeping worksheet as attribute as xlsxwriter cannot re-open worksheets
-        self.datetime_format = self.wb.add_format({'num_format': 'dd/mm/yyyy hh:mm:ss'}) #essential for xlxswriter to save dates as native Excel format
+        self.datetime_format = self.wb.add_format(
+            {"num_format": "dd/mm/yyyy hh:mm:ss"}
+        )  # essential for xlxswriter to save dates as native Excel format
 
     def get_file_name(self):
         formatted_today = datetime.now().strftime("%Y-%m-%d")
@@ -164,7 +172,12 @@ class XLSXGraph:
                 for row_idx, data_row in enumerate(temp_data):
                     for column_idx, data_column in enumerate(data_row):
                         if isinstance(data_column, datetime):
-                            self.ws.write(row_idx, self.start_col + column_idx, data_column, self.datetime_format)
+                            self.ws.write(
+                                row_idx,
+                                self.start_col + column_idx,
+                                data_column,
+                                self.datetime_format,
+                            )
                         self.ws.write(row_idx, self.start_col + column_idx, data_column)
 
                 self.start_col = self.start_col + data_width + 1

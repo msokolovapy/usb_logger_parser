@@ -30,9 +30,7 @@ class AnalyticalService:
                 df, unit.spike_duration, unit.total_spikes_duration
             )
             df = self.find_mkt(df, unit.temp_data)
-            spike_info = self.prepare_spike_summary_for_reporting(
-                df, unit.metadata
-            )
+            spike_info = self.prepare_spike_summary_for_reporting(df, unit.metadata)
             spike_dict_list.append(spike_info)
         return spike_dict_list
 
@@ -160,13 +158,13 @@ class AnalyticalService:
         return df_excursions
 
     # def prepare_df_for_reporting(self, df):
-        #     df = convert_timestamps(df)
-            #     column_names = df.columns.tolist()
-                #     values = df.values.tolist()
-                    #     values.insert(0, column_names)
-                        #     return tuple(
-                            #         [tuple(value) for value in values]
-                                #     )  # returns tuple of tuples of headers and all values row by row
+    #     df = convert_timestamps(df)
+    #     column_names = df.columns.tolist()
+    #     values = df.values.tolist()
+    #     values.insert(0, column_names)
+    #     return tuple(
+    #         [tuple(value) for value in values]
+    #     )  # returns tuple of tuples of headers and all values row by row
 
     def calculate_mkt_24hr_window(self, row, df):
         window_start = row["extreme_date_time"] - timedelta(hours=12)

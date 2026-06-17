@@ -336,6 +336,42 @@ class TestHelperFunctions(unittest.TestCase):
         result = get_ave_data_coll_freq(df)
         self.assertEqual(result, 152.0)
 
+    def test_insert_metadata_header(self):
+        self.fail("finish testing")
+
+    def test_extract_to_dict(self):
+        self.fail("finish testing")
+
+    def test_convert_timestamps(self):
+        df = pd.DataFrame(
+            {
+                "date_time": [
+                    Timestamp("2020-03-15 12:00:00"),
+                    Timestamp("2020-03-15 12:10:00"),
+                    Timestamp("2020-03-15 12:20:00"),
+                ],
+                "date": [
+                    Timestamp("2020-03-15"),
+                    Timestamp("2020-03-15"),
+                    Timestamp("2020-03-15 "),
+                ],
+            }
+        )
+        result = convert_timestamps(df)
+        expected = {
+            "date_time": [
+                datetime.datetime("2020-03-15 12:00:00"),
+                datetime.datetime("2020-03-15 12:10:00"),
+                datetime.datetime("2020-03-15 12:20:00"),
+            ],
+            "date": [
+                datetime.datetime("2020-03-15"),
+                datetime.datetime("2020-03-15"),
+                datetime.datetime("2020-03-15"),
+            ],
+        }
+        self.assertEqual(expected, result.to_dict("list"))
+
 
 class TestAnalyticalServiceInit(unittest.TestCase):
     def test_analyt_service_init(self):
@@ -343,7 +379,7 @@ class TestAnalyticalServiceInit(unittest.TestCase):
         self.assertIsNotNone(analytical_service.analyze_spikes)
 
 
-class TestAnalyzeSpikes(unittest.TestCase):
+class TestAnalyticalService(unittest.TestCase):
     def setUp(self):
         self.analytical_service = AnalyticalService()
         df_temp_data = pd.DataFrame(
@@ -1131,7 +1167,7 @@ class TestReportingService(unittest.TestCase):
         ]
         expected_row_min = 3
         expected_row_max = 8
-        print(f'here is the {result}')
+        print(f"here is the {result}")
         self.assertEqual((expected_row_min, expected_row_max, expected_data), result)
 
     def test_prepare_data_for_reporting_(self):
