@@ -30,8 +30,8 @@ class AnalyticalService:
                 df, unit.spike_duration, unit.total_spikes_duration
             )
             df = self.find_mkt(df, unit.temp_data)
-            spike_info = self.prepare_df_for_reporting(
-                df, unit.logger.id, unit.logger.serial_numb, unit.metadata
+            spike_info = self.prepare_spike_summary_for_reporting(
+                df, unit.metadata
             )
             spike_dict_list.append(spike_info)
         return spike_dict_list
@@ -159,14 +159,14 @@ class AnalyticalService:
         )
         return df_excursions
 
-    def prepare_df_for_reporting(self, df):
-        df = convert_timestamps(df)
-        column_names = df.columns.tolist()
-        values = df.values.tolist()
-        values.insert(0, column_names)
-        return tuple(
-            [tuple(value) for value in values]
-        )  # returns tuple of tuples of headers and all values row by row
+    # def prepare_df_for_reporting(self, df):
+        #     df = convert_timestamps(df)
+            #     column_names = df.columns.tolist()
+                #     values = df.values.tolist()
+                    #     values.insert(0, column_names)
+                        #     return tuple(
+                            #         [tuple(value) for value in values]
+                                #     )  # returns tuple of tuples of headers and all values row by row
 
     def calculate_mkt_24hr_window(self, row, df):
         window_start = row["extreme_date_time"] - timedelta(hours=12)
@@ -195,14 +195,19 @@ class AnalyticalService:
         mkt = round(mkt, 1)
         return mkt
 
-    def prepare_df_for_reporting(self, df, logger_id, logger_serial_number, file_name):
-        df = convert_timestamps(df)
-        column_names = df.columns.tolist()
-        values = df.values.tolist()
-        values.insert(0, column_names)
-        values.insert(0, ["usb_logger_id", logger_id])
-        values.insert(0, ["usb_serial_number", logger_serial_number])
-        values.insert(0, ["file_name", file_name])
-        return tuple(
-            [tuple(value) for value in values]
-        )  # returns tuple of tuples of headers and all values row by row
+    # def prepare_df_for_reporting(self, df, logger_id, logger_serial_number, file_name):
+    #     df = convert_timestamps(df)
+    #     column_names = df.columns.tolist()
+    #     values = df.values.tolist()
+    #     values.insert(0, column_names)
+    #     values.insert(0, ["usb_logger_id", logger_id])
+    #     values.insert(0, ["usb_serial_number", logger_serial_number])
+    #     values.insert(0, ["file_name", file_name])
+    #     return tuple(
+    #         [tuple(value) for value in values]
+    #     )  # returns tuple of tuples of headers and all values row by row
+
+    def prepare_spike_summary_for_reporting(self, df_excursions, metadata):
+        data = extract_to_dict(df_excursions)
+        data_with_header = insert_metadata_header(data, metadata)
+        return data_with_header

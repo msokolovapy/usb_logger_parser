@@ -105,11 +105,16 @@ def get_extreme_temp(pandas_series_celsius):
     return pandas_series_celsius.loc[mask]
 
 
-def convert_timestamps(df):
-    df["extreme_date_time"] = pd.to_datetime(df["extreme_date_time"]).dt.to_pydatetime()
-    df["spike_date"] = pd.to_datetime(df["spike_date"]).dt.date
-    return df
+# def convert_timestamps(df):
+#     df["extreme_date_time"] = pd.to_datetime(df["extreme_date_time"]).dt.to_pydatetime()
+#     df["spike_date"] = pd.to_datetime(df["spike_date"]).dt.date
+#     return df
 
+def convert_timestamps(df):
+    for col in df.columns:
+        if pd.api.types.is_datetime64_any_dtype(df[col]):
+            df[col] = pd.to_datetime(df[col]).dt.to_pydatetime()
+    return df
 
 def data_collection_frequency_check(storage_units):
     if len(storage_units) == 1:
@@ -133,3 +138,16 @@ def get_ave_data_coll_freq(df):
     return ave_data_coll_freq
 
 
+
+def insert_metadata_header(data, metadata_list):
+    for metadata in metadata_list:
+        data.insert(0, metadata)
+    return data
+
+
+def extract_to_dict(df):
+    df = convert_timestamps(df)
+    values = df.values.tolist()
+    column_names = df.columns.tolist() 
+    values.insert(0, column_names) # to obtain data as a list of lists for easy writing to xlsx workbook later
+    return values

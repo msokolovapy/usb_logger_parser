@@ -96,7 +96,11 @@ class Fridge(StorageCondition):
         self.logger = USBLogger(
             id=logger_id, serial_numb=serial_numb, ave_data_coll_freq=ave_data_coll_freq
         )
-        self.metadata = file_basename
+        self.file_basename = file_basename
+
+    @property
+    def metadata(self):
+        return [['usb_logger_id',self.logger.id], ['usb_logger_serial_number',self.logger.serial_numb], ['file_name',self.file_basename]]
 
 
 @dataclass

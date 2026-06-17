@@ -172,7 +172,7 @@ class TestColdChainUnit(unittest.TestCase):
             self.assertEqual(fridge.logger.id, "ACPL01")
             self.assertEqual(fridge.logger.serial_numb, "00001")
             self.assertEqual(fridge.temp_data.shape, (20, 6))
-            self.assertEqual(fridge.metadata, "ACPL234_ACPL01_09Apr2026")
+            self.assertEqual(fridge.file_basename, "ACPL234_ACPL01_09Apr2026")
 
 
 class TestHelperFunctions(unittest.TestCase):
@@ -994,7 +994,7 @@ class TestAnalyzeSpikes(unittest.TestCase):
             sample_df,
             self.unit.logger.id,
             self.unit.logger.serial_numb,
-            self.unit.metadata,
+            self.unit.file_basename,
         )
         expected_result = (
             ("file_name", "dummy.txt"),

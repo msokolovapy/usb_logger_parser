@@ -12,49 +12,13 @@ class ReportingService:
     def __init__(self):
         self.data_to_graph = []
 
-    def report_spike_dict_(self, spike_info_list):
-        return XlSXSummary(spike_info_list)
+    def prepare_data_for_reporting(self, unit):
+        data = extract_to_dict(unit.temp_data)
+        data_width = unit.temp_data.shape[1]
 
-    def report_data_(self, storage_units):
-        for unit in storage_units:
-            if not data_collection_frequency_check(storage_units):
-                logger.warning(
-                    "Mismatch of USB data loggers' data collection frequencies"
-                )
-                raise ValueError(
-                    "Mismatch of USB data loggers' data collection frequencies"
-                )
-            prepared_data = self.prepare_data_for_reporting_(unit)
-            self.data_to_graph.append(prepared_data)
-        xlsxgraph = XLSXGraph(self.data_to_graph)
-        xlsxgraph.insert_data()
-        xlsxgraph.insert_chart()
-
-    def extract_to_dict(self, df):
-        data_width = df.shape[1]
-        df["date_time"] = pd.to_datetime(df["date_time"]).dt.to_pydatetime()
-        values = df.values.tolist()
-        column_names = df.columns.tolist() # to obtain data as a list of lists for easy writing to xlsx workbook later
-        values.insert(0, column_names)
-        values = tuple([tuple(value) for value in values]) #to make tuple of tuples for immutability
-        return values, data_width
-
-    def insert_metadata_header_(self, data, data_width, logger_metadata):
-        data_row_min = 1  # row 0 is already taken by column names
-        for metadata in logger_metadata:
-            metadata_header = [metadata, *[None] * (data_width - 1)]
-            data.insert(0, metadata_header)
-            data_row_min += 1
-        data_row_max = len(data)
-        return data_row_min, data_row_max, data
-
-
-    def prepare_data_for_reporting_(self, unit):
-        data, data_width = self.extract_to_dict(unit.temp_data)
-        metadata = (unit.logger.id, unit.logger.serial_numb)
-        data_row_min, data_row_max, data_with_header = self.insert_metadata_header_(
-            data, data_width, metadata
-        )
+        data_with_header = insert_metadata_header(data, unit.metadata)
+        data_row_min = len(unit.metadata) + 2 #to account for column fields already present in data
+        data_row_max = len(data_with_header)
         return {
             unit: {
                 "data": data_with_header,
@@ -63,6 +27,61 @@ class ReportingService:
                 "data_width": data_width,
             }
         }
+
+
+    def report_spikes(self, spike_info_list):
+        return XlSXSummary(spike_info_list)
+
+    def report_raw_data(self, storage_units):
+        for unit in storage_units:
+            if not data_collection_frequency_check(storage_units):
+                logger.warning(
+                    "Mismatch of USB data loggers' data collection frequencies"
+                )
+                raise ValueError(
+                    "Mismatch of USB data loggers' data collection frequencies"
+                )
+            prepared_data = self.prepare_data_for_reporting(unit)
+            self.data_to_graph.append(prepared_data)
+        xlsxgraph = XLSXGraph(self.data_to_graph)
+        xlsxgraph.insert_data()
+        xlsxgraph.insert_chart()
+
+
+
+    # def extract_to_dict(self, df):
+    #     data_width = df.shape[1]
+    #     df["date_time"] = pd.to_datetime(df["date_time"]).dt.to_pydatetime()
+    #     values = df.values.tolist()
+    #     column_names = df.columns.tolist() # to obtain data as a list of lists for easy writing to xlsx workbook later
+    #     values.insert(0, column_names)
+    #     values = tuple([tuple(value) for value in values]) #to make tuple of tuples for immutability
+    #     return values, data_width
+
+    # def insert_metadata_header_(self, data, data_width, logger_metadata):
+    #     data_row_min = 1  # row 0 is already taken by column names
+    #     for metadata in logger_metadata:
+    #         metadata_header = [metadata, *[None] * (data_width - 1)]
+    #         data.insert(0, metadata_header)
+    #         data_row_min += 1
+    #     data_row_max = len(data)
+    #     return data_row_min, data_row_max, data
+
+
+    # def prepare_data_for_reporting_(self, unit):
+    #     data, data_width = self.extract_to_dict(unit.temp_data)
+    #     metadata = (unit.logger.id, unit.logger.serial_numb)
+    #     data_row_min, data_row_max, data_with_header = self.insert_metadata_header_(
+    #         data, data_width, metadata
+    #     )
+    #     return {
+    #         unit: {
+    #             "data": data_with_header,
+    #             "data_row_min": data_row_min,
+    #             "data_row_max": data_row_max,
+    #             "data_width": data_width,
+    #         }
+    #     }
 
 
 class XLSXSummary:
