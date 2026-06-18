@@ -13,7 +13,11 @@ class StorageCondition:
         df_temp_data, logger_id, serial_numb, file_basename = read(file)
         average_temp = get_average_temp(df_temp_data)
         ave_data_coll_freq = get_ave_data_coll_freq(df_temp_data)
-        if Limits.fridge.low_alarm <= average_temp <= Limits.fridge.high_alarm:
+        if (
+            Limits.cold_storage.low_alarm
+            <= average_temp
+            <= Limits.cold_storage.high_alarm
+        ):
             while True:
                 user_input = get_user_confirmation()
                 if user_input == "FG":
@@ -35,7 +39,11 @@ class StorageCondition:
                 else:
                     print("Please either enter FG or CS")
                     continue
-        elif Limits.freezer.low_alarm <= average_temp <= Limits.freezer.high_alarm:
+        elif (
+            Limits.freezer.low_alarm
+            <= average_temp
+            <= Limits.freezer.high_alarm
+        ):
             return Freezer(
                 df_temp_data, logger_id, serial_numb, ave_data_coll_freq, file_basename
             )
@@ -67,7 +75,19 @@ def create_storage_condition_manually(
     storage_condit_dict = {
         "FG": Fridge(
             df_temp_data, logger_id, serial_numb, ave_data_coll_freq, file_basename
-        )
+        ),
+        "FZ": Freezer(
+            df_temp_data, logger_id, serial_numb, ave_data_coll_freq, file_basename
+        ),
+        "CS": ColdStorage(
+            df_temp_data, logger_id, serial_numb, ave_data_coll_freq, file_basename
+        ),
+        "25C": TwentyFiveCelsius(
+            df_temp_data, logger_id, serial_numb, ave_data_coll_freq, file_basename
+        ),
+        "50C": FiftyCelsius(
+            df_temp_data, logger_id, serial_numb, ave_data_coll_freq, file_basename
+        ),
     }
     while True:
         user_input = input(
@@ -82,7 +102,7 @@ def create_storage_condition_manually(
             continue
 
 
-class Fridge(StorageCondition):
+class Fridge:
     def __init__(
         self, df_temp_data, logger_id, serial_numb, ave_data_coll_freq, file_basename
     ):
@@ -100,7 +120,111 @@ class Fridge(StorageCondition):
 
     @property
     def metadata(self):
-        return [['usb_logger_id',self.logger.id], ['usb_logger_serial_number',self.logger.serial_numb], ['file_name',self.file_basename]]
+        return [
+            ["usb_logger_id", self.logger.id],
+            ["usb_logger_serial_number", self.logger.serial_numb],
+            ["file_name", self.file_basename],
+        ]
+
+
+class Freezer:
+    def __init__(
+        self, df_temp_data, logger_id, serial_numb, ave_data_coll_freq, file_basename
+    ):
+        self.low_alarm = Limits.freezer.low_alarm
+        self.high_alarm = Limits.freezer.high_alarm
+        self.low_alert = Limits.freezer.low_alert
+        self.high_alert = Limits.freezer.high_alert
+        self.spike_duration = Limits.freezer.spike_duration
+        self.total_spikes_duration = Limits.freezer.total_spikes_duration
+        self.temp_data = df_temp_data
+        self.logger = USBLogger(
+            id=logger_id, serial_numb=serial_numb, ave_data_coll_freq=ave_data_coll_freq
+        )
+        self.file_basename = file_basename
+
+    @property
+    def metadata(self):
+        return [
+            ["usb_logger_id", self.logger.id],
+            ["usb_logger_serial_number", self.logger.serial_numb],
+            ["file_name", self.file_basename],
+        ]
+
+
+class ColdStorage:
+    def __init__(
+        self, df_temp_data, logger_id, serial_numb, ave_data_coll_freq, file_basename
+    ):
+        self.low_alarm = Limits.cold_storage.low_alarm
+        self.high_alarm = Limits.cold_storage.high_alarm
+        self.low_alert = Limits.cold_storage.low_alert
+        self.high_alert = Limits.cold_storage.high_alert
+        self.spike_duration = Limits.cold_storage.spike_duration
+        self.total_spikes_duration = Limits.cold_storage.total_spikes_duration
+        self.temp_data = df_temp_data
+        self.logger = USBLogger(
+            id=logger_id, serial_numb=serial_numb, ave_data_coll_freq=ave_data_coll_freq
+        )
+        self.file_basename = file_basename
+
+    @property
+    def metadata(self):
+        return [
+            ["usb_logger_id", self.logger.id],
+            ["usb_logger_serial_number", self.logger.serial_numb],
+            ["file_name", self.file_basename],
+        ]
+
+
+class TwentyFiveCelsius:
+    def __init__(
+        self, df_temp_data, logger_id, serial_numb, ave_data_coll_freq, file_basename
+    ):
+        self.low_alarm = Limits.storage_25c.low_alarm
+        self.high_alarm = Limits.storage_25c.high_alarm
+        self.low_alert = Limits.storage_25c.low_alert
+        self.high_alert = Limits.storage_25c.high_alert
+        self.spike_duration = Limits.storage_25c.spike_duration
+        self.total_spikes_duration = Limits.storage_25c.total_spikes_duration
+        self.temp_data = df_temp_data
+        self.logger = USBLogger(
+            id=logger_id, serial_numb=serial_numb, ave_data_coll_freq=ave_data_coll_freq
+        )
+        self.file_basename = file_basename
+
+    @property
+    def metadata(self):
+        return [
+            ["usb_logger_id", self.logger.id],
+            ["usb_logger_serial_number", self.logger.serial_numb],
+            ["file_name", self.file_basename],
+        ]
+
+
+class FiftyCelsius:
+    def __init__(
+        self, df_temp_data, logger_id, serial_numb, ave_data_coll_freq, file_basename
+    ):
+        self.low_alarm = Limits.storage_50c.low_alarm
+        self.high_alarm = Limits.storage_50c.high_alarm
+        self.low_alert = Limits.storage_50c.low_alert
+        self.high_alert = Limits.storage_50c.high_alert
+        self.spike_duration = Limits.storage_50c.spike_duration
+        self.total_spikes_duration = Limits.storage_50c.total_spikes_duration
+        self.temp_data = df_temp_data
+        self.logger = USBLogger(
+            id=logger_id, serial_numb=serial_numb, ave_data_coll_freq=ave_data_coll_freq
+        )
+        self.file_basename = file_basename
+
+    @property
+    def metadata(self):
+        return [
+            ["usb_logger_id", self.logger.id],
+            ["usb_logger_serial_number", self.logger.serial_numb],
+            ["file_name", self.file_basename],
+        ]
 
 
 @dataclass

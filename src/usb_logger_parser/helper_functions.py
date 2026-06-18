@@ -145,7 +145,7 @@ def insert_metadata_header(data, metadata_list):
     return data
 
 
-def extract_to_dict(df):
+def extract_to_list(df):
     df = convert_timestamps(df)
     values = df.values.tolist()
     column_names = df.columns.tolist() 

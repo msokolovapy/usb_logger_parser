@@ -2,7 +2,7 @@ from xlsxwriter import Workbook
 import logging
 import pandas as pd
 from datetime import datetime, date
-from src.usb_logger_parser.helper_functions import data_collection_frequency_check
+from src.usb_logger_parser.helper_functions import data_collection_frequency_check, extract_to_list, insert_metadata_header
 
 logger = logging.getLogger(__name__)
 
@@ -12,7 +12,7 @@ class ReportingService:
         self.data_to_graph = []
 
     def prepare_data_for_reporting(self, unit):
-        data = extract_to_dict(unit.temp_data)
+        data = extract_to_list(unit.temp_data)
         data_width = unit.temp_data.shape[1]
 
         data_with_header = insert_metadata_header(data, unit.metadata)
@@ -46,39 +46,6 @@ class ReportingService:
         xlsxgraph = XLSXGraph(self.data_to_graph)
         xlsxgraph.insert_data()
         xlsxgraph.insert_chart()
-
-    # def extract_to_dict(self, df):
-    #     data_width = df.shape[1]
-    #     df["date_time"] = pd.to_datetime(df["date_time"]).dt.to_pydatetime()
-    #     values = df.values.tolist()
-    #     column_names = df.columns.tolist() # to obtain data as a list of lists for easy writing to xlsx workbook later
-    #     values.insert(0, column_names)
-    #     values = tuple([tuple(value) for value in values]) #to make tuple of tuples for immutability
-    #     return values, data_width
-
-    # def insert_metadata_header_(self, data, data_width, logger_metadata):
-    #     data_row_min = 1  # row 0 is already taken by column names
-    #     for metadata in logger_metadata:
-    #         metadata_header = [metadata, *[None] * (data_width - 1)]
-    #         data.insert(0, metadata_header)
-    #         data_row_min += 1
-    #     data_row_max = len(data)
-    #     return data_row_min, data_row_max, data
-
-    # def prepare_data_for_reporting_(self, unit):
-    #     data, data_width = self.extract_to_dict(unit.temp_data)
-    #     metadata = (unit.logger.id, unit.logger.serial_numb)
-    #     data_row_min, data_row_max, data_with_header = self.insert_metadata_header_(
-    #         data, data_width, metadata
-    #     )
-    #     return {
-    #         unit: {
-    #             "data": data_with_header,
-    #             "data_row_min": data_row_min,
-    #             "data_row_max": data_row_max,
-    #             "data_width": data_width,
-    #         }
-    #     }
 
 
 class XLSXSummary:

@@ -121,58 +121,89 @@ class TestColdChainUnit(unittest.TestCase):
     def tearDown(self):
         pass
 
-    def test_create_cc_unit(self):
+    def test_cc_unit_init(self):
+        file = 'dummy.txt'
         with (
-            patch(
-                "src.usb_logger_parser.storage_units.create_storage_condition_manually"
-            ) as mock_manual_create,
-            patch(
-                "src.usb_logger_parser.storage_units.get_user_confirmation"
-            ) as mock_user_confirmation,
-            patch(
-                "src.usb_logger_parser.storage_units.get_average_temp"
-            ) as mock_get_ave_temp,
             patch("src.usb_logger_parser.storage_units.read") as mock_read,
             patch(
                 "src.usb_logger_parser.storage_units.get_ave_data_coll_freq"
             ) as mock_ave_data_coll_freq,
+            patch(
+                "src.usb_logger_parser.storage_units.get_average_temp"
+            ) as mock_get_ave_temp,
+            patch(
+                "src.usb_logger_parser.storage_units.get_user_confirmation"
+            ) as mock_user_confirmation,
+            patch(
+                "src.usb_logger_parser.storage_units.create_storage_condition_manually"
+            ) as mock_manual_create,
+        ):
+            mock_read.return_value = (
+                "df_temp_data",
+                "logger_id",
+                "serial_numb",
+                "file_basename",
+            )
+            mock_ave_data_coll_freq.return_value = "ave_data_coll_freq"
+
+            with self.subTest():
+                mock_get_ave_temp.return_value = 5.0
+                mock_user_confirmation.side_effect = ["wrong entry", "FG"]
+
+                unit = StorageCondition.create_from_(file)
+                mock_read.assert_called_with(file)
+                mock_get_ave_temp.assert_called_with("df_temp_data")
+                mock_ave_data_coll_freq.assert_called_with("df_temp_data")
+                mock_user_confirmation.assert_called()
+
+            with self.subTest():
+                mock_get_ave_temp.return_value = 999.9
+
+                unit = StorageCondition.create_from_(file)
+                mock_read.assert_called_with(file)
+                mock_get_ave_temp.assert_called_with("df_temp_data")
+                mock_ave_data_coll_freq.assert_called_with("df_temp_data")
+                mock_manual_create.assert_called()
+
+    def test_create_cc_unit(self):
+        with (
+            patch("src.usb_logger_parser.storage_units.read") as mock_read,
+            patch(
+                "src.usb_logger_parser.storage_units.get_ave_data_coll_freq"
+            ) as mock_ave_data_coll_freq,
+            patch(
+                "src.usb_logger_parser.storage_units.get_average_temp"
+            ) as mock_get_ave_temp,
+            patch(
+                "src.usb_logger_parser.storage_units.get_user_confirmation"
+            ) as mock_user_confirmation,
         ):
 
-            file = "dummy.txt"
-
             mock_read.return_value = (
-                self.df_temp_data,
-                self.logger_id,
-                self.serial_numb,
-                self.file_basename,
+                "df_temp_data",
+                "ACPL01",
+                "000001",
+                "file_basename",
             )
-            mock_get_ave_temp.return_value = 5.0
-            mock_ave_data_coll_freq.return_value = 152.0
-            mock_user_confirmation.side_effect = ["abracadabra", "FG"]
-            mock_manual_create.return_value = Fridge(
-                self.df_temp_data,
-                self.logger_id,
-                self.serial_numb,
-                self.ave_data_coll_freq,
-                self.file_basename,
+            mock_get_ave_temp.return_value = 50.0
+
+            unit = StorageCondition.create_from_('dummy.txt')
+
+            self.assertIsNotNone(unit)
+            self.assertEqual(unit.low_alarm, 45.0)
+            self.assertEqual(unit.high_alarm, 55.0)
+            self.assertEqual(unit.spike_duration, 900)
+            self.assertEqual(unit.logger.id, "ACPL01")
+            self.assertEqual(unit.logger.serial_numb, "000001")
+            self.assertEqual(unit.file_basename, "file_basename")
+            self.assertEqual(
+                unit.metadata,
+                [
+                    ["usb_logger_id", "ACPL01"],
+                    ["usb_logger_serial_number", "000001"],
+                    ["file_name", "file_basename"],
+                ],
             )
-
-            fridge = StorageCondition.create_from_(file)
-
-            mock_read.assert_called_with(file)
-            mock_get_ave_temp.assert_called()
-            mock_ave_data_coll_freq.assert_called()
-            mock_user_confirmation.assert_called()
-            mock_manual_create.assert_called()
-
-            self.assertIsNotNone(fridge)
-            self.assertEqual(fridge.low_alarm, 2.0)
-            self.assertEqual(fridge.high_alarm, 8.0)
-            self.assertEqual(fridge.spike_duration, 3600)
-            self.assertEqual(fridge.logger.id, "ACPL01")
-            self.assertEqual(fridge.logger.serial_numb, "00001")
-            self.assertEqual(fridge.temp_data.shape, (20, 6))
-            self.assertEqual(fridge.file_basename, "ACPL234_ACPL01_09Apr2026")
 
 
 class TestHelperFunctions(unittest.TestCase):
@@ -360,14 +391,14 @@ class TestHelperFunctions(unittest.TestCase):
         result = convert_timestamps(df)
         expected = {
             "date_time": [
-                datetime.datetime("2020-03-15 12:00:00"),
-                datetime.datetime("2020-03-15 12:10:00"),
-                datetime.datetime("2020-03-15 12:20:00"),
+                datetime.datetime(2020, 3, 15, 12),
+                datetime.datetime(2020, 3, 15, 12, 10),
+                datetime.datetime(2020, 3, 15, 12, 20),
             ],
             "date": [
-                datetime.datetime("2020-03-15"),
-                datetime.datetime("2020-03-15"),
-                datetime.datetime("2020-03-15"),
+                datetime.datetime(2020, 3, 15),
+                datetime.datetime(2020, 3, 15),
+                datetime.datetime(2020, 3, 15),
             ],
         }
         self.assertEqual(expected, result.to_dict("list"))
@@ -428,8 +459,8 @@ class TestAnalyticalService(unittest.TestCase):
             ) as mock_check_limits,
             patch.object(AnalyticalService, "find_mkt") as mock_mkt,
             patch.object(
-                AnalyticalService, "annotate_spike_dict_with_metadata"
-            ) as mock_annotate_dict,
+                AnalyticalService, "prepare_spike_summary_for_reporting"
+            ) as mock_prepare_for_reporting,
         ):
             mock_add_status.side_effect = ["df_added_status"]
             mock_cumulat_id.side_effect = ["df_with_cumulat_spike_id"]
@@ -439,7 +470,7 @@ class TestAnalyticalService(unittest.TestCase):
             mock_renumber_spikes.return_value = "df_renumbered_spikes"
             mock_check_limits.return_value = "df_checked_against_limits"
             mock_mkt.return_value = "spike_dict_mkt_calculated"
-            mock_annotate_dict.return_value = "spike_dict_annotated"
+            mock_prepare_for_reporting.return_value = "spikes_prepared_for_reporting"
 
             result = self.analytical_service.analyze_spikes([self.unit])
 
@@ -462,12 +493,16 @@ class TestAnalyticalService(unittest.TestCase):
             mock_mkt.assert_called_with(
                 "df_checked_against_limits", self.unit.temp_data
             )
-            mock_annotate_dict.assert_called_with(
-                "spike_dict_mkt_calculated", "ACP169 BU_FZ156", "052297777", "dummy.txt"
+            mock_prepare_for_reporting.assert_called_with(
+                "spike_dict_mkt_calculated",
+                [
+                    ["usb_logger_id", "ACP169 BU_FZ156"],
+                    ["usb_logger_serial_number", "052297777"],
+                    ["file_name", "dummy.txt"],
+                ],
             )
 
-            self.assertEqual(result, ["spike_dict_annotated"])
-            self.fail("finish adding more details for changed last lines")
+            self.assertEqual(result, ["spikes_prepared_for_reporting"])
 
         spike_dict = self.analytical_service.analyze_spikes([self.unit])
         print(spike_dict)
@@ -1012,56 +1047,26 @@ class TestAnalyticalService(unittest.TestCase):
         result = self.analytical_service.apply_arrhenius(sample_df)
         self.assertEqual(result, expected_result)
 
-    def test_prepare_df_for_reporting(self):
-        sample_df = pd.DataFrame(
-            {
-                "cumulat_spike_id": [1, 3],
-                "extreme_temp": [20.0, 1.5],
-                "spike_date": [Timestamp("2020-03-15"), Timestamp("2020-03-16")],
-                "extreme_date_time": [
-                    Timestamp("2020-03-15 10:30:00"),
-                    Timestamp("2020-03-16 11:10:00"),
-                ],
-                "spike_duration_mins": [20, 30],
-                "spike_duration_24hr_mins": [20.0, 30.0],
-            }
-        )
-        result = self.analytical_service.prepare_df_for_reporting(
-            sample_df,
-            self.unit.logger.id,
-            self.unit.logger.serial_numb,
-            self.unit.file_basename,
-        )
-        expected_result = (
-            ("file_name", "dummy.txt"),
-            ("usb_serial_number", "052297777"),
-            ("usb_logger_id", "ACP169 BU_FZ156"),
-            (
-                "cumulat_spike_id",
-                "extreme_temp",
-                "spike_date",
-                "extreme_date_time",
-                "spike_duration_mins",
-                "spike_duration_24hr_mins",
-            ),
-            (
-                1,
-                20.0,
-                datetime.date(2020, 3, 15),
-                datetime.datetime(2020, 3, 15, 10, 30),
-                20,
-                20.0,
-            ),
-            (
-                3,
-                1.5,
-                datetime.date(2020, 3, 16),
-                datetime.datetime(2020, 3, 16, 11, 10),
-                30,
-                30.0,
-            ),
-        )
-        self.assertEqual(expected_result, result)
+    def test_prepare_spike_summary_for_reporting(self):
+        with (
+            patch(
+                "src.usb_logger_parser.analytical_service.extract_to_list"
+            ) as mock_extract_to_list,
+            patch(
+                "src.usb_logger_parser.analytical_service.insert_metadata_header"
+            ) as mock_insert_metadata_header,
+        ):
+            mock_extract_to_list.return_value = "data_extracted"
+            mock_insert_metadata_header.return_value = "data_with_header"
+            result = self.analytical_service.prepare_spike_summary_for_reporting(
+                "df_excursions", "usb_logger_metadata"
+            )
+
+            mock_extract_to_list.assert_called_with("df_excursions")
+            mock_insert_metadata_header.assert_called_with(
+                "data_extracted", "usb_logger_metadata"
+            )
+            self.assertEqual(result, "data_with_header")
 
 
 class TestReportingService(unittest.TestCase):
@@ -1097,7 +1102,7 @@ class TestReportingService(unittest.TestCase):
     def tearDown(self):
         pass
 
-    def test_report_data_(self):
+    def test_report_raw_data(self):
         sample_data = {
             self.unit: {
                 "data": "data_with_header",
@@ -1109,7 +1114,7 @@ class TestReportingService(unittest.TestCase):
 
         with (
             patch.object(
-                ReportingService, "prepare_data_for_reporting_"
+                ReportingService, "prepare_data_for_reporting"
             ) as mock_prepare_data,
             patch.object(XLSXGraph, "insert_data") as mock_insert_data,
             patch.object(XLSXGraph, "insert_chart") as mock_insert_chart,
@@ -1117,98 +1122,56 @@ class TestReportingService(unittest.TestCase):
             mock_prepare_data.return_value = sample_data
             storage_units = [self.unit]
 
-            result = self.reporting_service.report_data_(storage_units)
+            result = self.reporting_service.report_raw_data(storage_units)
 
             mock_prepare_data.assert_called_with(self.unit)
             mock_insert_data.assert_called()
             mock_insert_chart.assert_called()
             self.assertEqual(self.reporting_service.data_to_graph, [sample_data])
 
-    def test_extract_to_dict(self):
-        sample_df = self.unit.temp_data
-        result = self.reporting_service.extract_to_dict(sample_df)
-        expected_data = (
-            (
-                ("row_numb", "date_time", "celsius"),
-                (1, datetime.datetime(2020, 3, 16, 10, 30), 0.0),
-                (2, datetime.datetime(2020, 3, 16, 10, 40), 0.5),
-                (3, datetime.datetime(2020, 3, 16, 10, 50), 1.0),
-                (4, datetime.datetime(2020, 3, 16, 11, 0), 1.5),
-                (5, datetime.datetime(2020, 3, 16, 11, 10), 2.0),
-            ),
-            3,
-        )
-        expected_data_width = 3
-        self.assertEqual(result, expected_data)
-
-    def test_insert_metadata_header(self):
-        logger_metadata = ("ACP169 BU_FZ156", "052297777")
-        data_width = 3
-        data = (
-            ("row_numb", "date_time", "celsius"),
-            (1, datetime.datetime(2020, 3, 16, 10, 30), 0.0),
-            (2, datetime.datetime(2020, 3, 16, 10, 40), 0.5),
-            (3, datetime.datetime(2020, 3, 16, 10, 50), 1.0),
-            (4, datetime.datetime(2020, 3, 16, 11, 0), 1.5),
-            (5, datetime.datetime(2020, 3, 16, 11, 10), 2.0),
-        )
-        result = self.reporting_service.insert_metadata_header_(
-            data, data_width, logger_metadata
-        )
-        expected_data = [
-            ["052297777", None, None],
-            ["ACP169 BU_FZ156", None, None],
-            ["row_numb", "date_time", "celsius"],
-            [1, "2020-03-16 10:30:00", 0.0],
-            [2, "2020-03-16 10:40:00", 0.5],
-            [3, "2020-03-16 10:50:00", 1.0],
-            [4, "2020-03-16 11:00:00", 1.5],
-            [5, "2020-03-16 11:10:00", 2.0],
-        ]
-        expected_row_min = 3
-        expected_row_max = 8
-        print(f"here is the {result}")
-        self.assertEqual((expected_row_min, expected_row_max, expected_data), result)
-
     def test_prepare_data_for_reporting_(self):
         with (
-            patch.object(ReportingService, "extract_to_dict") as mock_extract_to_dict,
-            patch.object(
-                ReportingService, "insert_metadata_header_"
+            patch(
+                "src.usb_logger_parser.reporting_service.extract_to_list"
+            ) as mock_extract_to_list,
+            patch(
+                "src.usb_logger_parser.reporting_service.insert_metadata_header"
             ) as mock_insert_metadata_header,
         ):
-            mock_extract_to_dict.return_value = ("data", "data_width")
-            mock_insert_metadata_header.return_value = (
-                "data_row_min",
-                "data_row_max",
-                "data_with_header",
-            )
-            result = self.reporting_service.prepare_data_for_reporting_(self.unit)
+            mock_extract_to_list.return_value = "data_extracted"
+            mock_insert_metadata_header.return_value = "data_with_header"
+            result = self.reporting_service.prepare_data_for_reporting(self.unit)
             expected_result = {
                 self.unit: {
                     "data": "data_with_header",
-                    "data_row_min": "data_row_min",
-                    "data_row_max": "data_row_max",
-                    "data_width": "data_width",
+                    "data_row_min": 5,
+                    "data_row_max": 16,
+                    "data_width": 3,
                 }
             }
-            mock_extract_to_dict.assert_called_with(self.unit.temp_data)
+            mock_extract_to_list.assert_called_with(self.unit.temp_data)
             mock_insert_metadata_header.assert_called_with(
-                "data",
-                "data_width",
-                (self.unit.logger.id, self.unit.logger.serial_numb),
+                "data_extracted",
+                [
+                    ["usb_logger_id", self.unit.logger.id],
+                    ["usb_logger_serial_number", self.unit.logger.serial_numb],
+                    ["file_name", self.unit.file_basename],
+                ],
             )
             self.assertEqual(result, expected_result)
+
+        def test_report_spikes(self):
+            self.fail("finish testing")
 
 
 class TestXLSXSummary(unittest.TestCase):
     def test_xlsx_summary_init(self):
-        spike_info_list = []
+        spikes_list = []
         today = datetime.datetime.now().strftime("%Y-%m-%d")
-        result = XLSXSummary(spike_info_list)
+        result = XLSXSummary(spikes_list)
 
         self.assertIsNotNone(result)
-        self.assertIsNotNone(result.spike_info_list)
+        self.assertIsNotNone(result.spikes_list)
         self.assertIsNotNone(result.wb)
         self.assertIsNotNone(result.ws)
         self.assertEqual(result.file_name, f"{today}_spikes_summary")

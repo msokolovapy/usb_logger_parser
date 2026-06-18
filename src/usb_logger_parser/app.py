@@ -15,9 +15,9 @@ def main():
     reporting_service = ReportingService()
     analytical_service = AnalyticalService()
     storage_units = [StorageCondition.create_from_(file) for file in file_list]
-    spike_dicts = analytical_service.analyze_spikes(storage_units)
-    xlsx_spike_reports = reporting_service.report_spike_dict_(spike_dicts)
-    xlsx_data_reports = reporting_service.report_data_(storage_units)
+    temp_spikes = analytical_service.analyze_spikes(storage_units)
+    reporting_service.report_spikes(temp_spikes)
+    reporting_service.report_raw_data(storage_units)
 
 
 if __name__ == "__main__":
