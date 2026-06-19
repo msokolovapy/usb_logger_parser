@@ -8,7 +8,7 @@ logger = logging.getLogger(__name__)
 
 
 def read(file):
-    valid_file = validate_(file)
+    valid_file = validate(file)
     df = pd.read_csv(
         file,
         encoding="latin-1",
@@ -57,7 +57,7 @@ def get_user_confirmation():
     return user_input
 
 
-def validate_(file):
+def validate(file):
     try:
         df = pd.read_csv(file, encoding="latin-1")
         if df.empty:
@@ -76,13 +76,12 @@ def validate_(file):
                 raise ValueError(f"Some values are missing in '{column}' column")
         return file
 
-    except FileNotFoundError:
+    except FileNotFoundError as e:
         logger.error(f"No file '{file}' found")
-        raise
+        raise e from None
     except Exception as e:
-        logger.exception(f"Unexpected error ({e}) occured when trying to load {file}")
-        raise
-    sys.exit(1)
+        logger.error(f"Unexpected error ({e}) occured when trying to load '{file}'")
+        raise e from None
 
 
 def get_spike_duration(pandas_series_date_time):
@@ -104,11 +103,6 @@ def get_extreme_temp(pandas_series_celsius):
     mask = pandas_series_celsius.abs().idxmax()
     return pandas_series_celsius.loc[mask]
 
-
-# def convert_timestamps(df):
-#     df["extreme_date_time"] = pd.to_datetime(df["extreme_date_time"]).dt.to_pydatetime()
-#     df["spike_date"] = pd.to_datetime(df["spike_date"]).dt.date
-#     return df
 
 def convert_timestamps(df):
     for col in df.columns:

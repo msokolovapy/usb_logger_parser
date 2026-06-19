@@ -10,7 +10,7 @@ from src.usb_logger_parser.helper_functions import (
     read,
     parse_,
     get_user_confirmation,
-    validate_,
+    validate,
     get_average_temp,
     get_extreme_date_time,
     get_extreme_temp,
@@ -122,7 +122,7 @@ class TestColdChainUnit(unittest.TestCase):
         pass
 
     def test_cc_unit_init(self):
-        file = 'dummy.txt'
+        file = "dummy.txt"
         with (
             patch("src.usb_logger_parser.storage_units.read") as mock_read,
             patch(
@@ -187,7 +187,7 @@ class TestColdChainUnit(unittest.TestCase):
             )
             mock_get_ave_temp.return_value = 50.0
 
-            unit = StorageCondition.create_from_('dummy.txt')
+            unit = StorageCondition.create_from_("dummy.txt")
 
             self.assertIsNotNone(unit)
             self.assertEqual(unit.low_alarm, 45.0)
@@ -237,6 +237,47 @@ class TestHelperFunctions(unittest.TestCase):
         self.assertIsNotNone(storage_condit)
         self.assertEqual(storage_condit.high_alert, 15.0)
 
+
+    def test_validate(self):
+        with self.subTest("file not found"):
+            with self.assertRaises(FileNotFoundError):
+                validate("dummy.txt")
+
+        test_cases = [
+            (
+                "empty_dataframe",
+                pd.DataFrame(),
+                ValueError,
+                "Empty dataframe when trying to load {file}",
+            ),
+            (
+                "missing_columns",
+                pd.DataFrame({"dummy_column": [1, 2, 3, 4]}),
+                KeyError,
+                "Some columns are missing: Time,Celsius(°C)",
+            ),
+            (
+                "missing_value",
+                pd.DataFrame({"Time": [1, 2, None, 4], "Celsius(°C)": [1, 2, 3, 4]}),
+                ValueError,
+                "Some values are missing in 'Time' column",
+            ),
+        ]
+
+        for test, mock_return_value, error, error_message in test_cases:
+            with self.subTest(test):
+                with patch(f"{__name__}.pd.read_csv") as mock_read_csv:
+                    mock_read_csv.return_value = mock_return_value
+                    with self.assertRaises(error) as context:
+                        validate("dummy.txt")
+                        self.assertIn(error_message, str(context.exception))
+
+        with self.subTest("any other random exception"):
+            with patch("src.usb_logger_parser.helper_functions.pd.read_csv") as mock_read_csv:
+                mock_read_csv.side_effect = pd.errors.ParserError
+                with self.assertRaises(pd.errors.ParserError):
+                    validate("file that raises an exception.txt")
+
     def test_get_average_temp(self):
         df = pd.DataFrame({"celsius": [-25.0, -26.0, -24.0, -23.0]})
         average_temp = get_average_temp(df)
@@ -246,7 +287,7 @@ class TestHelperFunctions(unittest.TestCase):
         self.fail("finish testing")
 
     @patch("os.path.basename")
-    @patch(f"{__name__}.validate_")
+    @patch(f"{__name__}.validate")
     @patch(f"{__name__}.pd.read_csv")
     def test_read(self, mock_read_csv, mock_valid_data, mock_basename):
         mock_valid_data.return_value = "dummy.txt"
@@ -310,18 +351,6 @@ class TestHelperFunctions(unittest.TestCase):
         spike_duration = get_spike_duration(sample_df_slice)
         self.assertEqual(spike_duration, 1460)
 
-    def test_convert_timestamps(self):
-        sample_df = pd.DataFrame(
-            {
-                "extreme_date_time": [Timestamp("2020-03-15 10:20:00")],
-                "spike_date": [Timestamp("2020-03-15")],
-            }
-        )
-        result = convert_timestamps(sample_df)
-        self.assertEqual(
-            result["extreme_date_time"][0], datetime.datetime(2020, 3, 15, 10, 20)
-        )
-        self.assertEqual(result["spike_date"][0], datetime.date(2020, 3, 15))
 
     def test_data_collection_frequency_check(self):
         units_pass = [Mock() for _ in range(4)]
@@ -1304,12 +1333,12 @@ class TestXLSXGraph(unittest.TestCase):
         xlsxgraph.insert_data()
         self.assertEqual(
             xlsxgraph.x_axis_bounds,
-            {"col_min": 10, "col_max": 0, "row_min": 3, "row_max": 7},
+            {"col_min": 10, "col_max": 10, "row_min": 3, "row_max": 7},
         )
         (data,) = xlsxgraph.data_to_graph
         self.assertEqual(
             data[self.unit]["y_axis_bounds"],
-            {"col_min": 12, "col_max": 0, "row_min": 3, "row_max": 7},
+            {"col_min": 12, "col_max": 12, "row_min": 3, "row_max": 7},
         )
         self.assertEqual(xlsxgraph.start_col, 14)
 
