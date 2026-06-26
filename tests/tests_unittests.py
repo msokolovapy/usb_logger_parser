@@ -18,6 +18,8 @@ from src.usb_logger_parser.helper_functions import (
     convert_timestamps,
     data_collection_frequency_check,
     get_ave_data_coll_freq,
+    extract_to_list,
+    insert_metadata_header,
 )
 from src.usb_logger_parser.storage_units import (
     StorageCondition,
@@ -237,7 +239,6 @@ class TestHelperFunctions(unittest.TestCase):
         self.assertIsNotNone(storage_condit)
         self.assertEqual(storage_condit.high_alert, 15.0)
 
-
     def test_validate(self):
         with self.subTest("file not found"):
             with self.assertRaises(FileNotFoundError):
@@ -273,7 +274,9 @@ class TestHelperFunctions(unittest.TestCase):
                         self.assertIn(error_message, str(context.exception))
 
         with self.subTest("any other random exception"):
-            with patch("src.usb_logger_parser.helper_functions.pd.read_csv") as mock_read_csv:
+            with patch(
+                "src.usb_logger_parser.helper_functions.pd.read_csv"
+            ) as mock_read_csv:
                 mock_read_csv.side_effect = pd.errors.ParserError
                 with self.assertRaises(pd.errors.ParserError):
                     validate("file that raises an exception.txt")
@@ -284,7 +287,40 @@ class TestHelperFunctions(unittest.TestCase):
         self.assertEqual(average_temp, -24.5)
 
     def test_parse_(self):
-        self.fail("finish testing")
+        df = pd.DataFrame(
+            {
+                "ACPL01": [1, 2, 3, 4],
+                "Time": [
+                    Timestamp("2020-03-16 10:30:00"),
+                    Timestamp("2020-03-16 10:40:00"),
+                    Timestamp("2020-03-16 10:50:00"),
+                    Timestamp("2020-03-16 11:00:00"),
+                ],
+                "Celsius(°C)": [0.0, 2.0, 3.0, 2.0],
+                "High Alarm": [10.0, 10.0, 10.0, 10.0],
+                "Low Alarm": [0.0, 0.0, 0.0, 0.0],
+                "Serial Number": ["0000123", None, None, None],
+            }
+        )
+        df_result, logger_id, serial_numb = parse_(df)
+        with self.subTest("parsing df"):
+            expected = {
+                "row_numb": [1, 2, 3, 4],
+                "date_time": [
+                    Timestamp("2020-03-16 10:30:00"),
+                    Timestamp("2020-03-16 10:40:00"),
+                    Timestamp("2020-03-16 10:50:00"),
+                    Timestamp("2020-03-16 11:00:00"),
+                ],
+                "celsius": [0.0, 2.0, 3.0, 2.0],
+                "high_alarm": [10.0, 10.0, 10.0, 10.0],
+                "low_alarm": [0.0, 0.0, 0.0, 0.0],
+            }
+            self.assertEqual(df_result.to_dict("list"), expected)
+        with self.subTest("parsing logger id"):
+            self.assertEqual(logger_id, "ACPL01")
+        with self.subTest("parsing serial number"):
+            self.assertEqual(serial_numb, "0000123")
 
     @patch("os.path.basename")
     @patch(f"{__name__}.validate")
@@ -351,7 +387,6 @@ class TestHelperFunctions(unittest.TestCase):
         spike_duration = get_spike_duration(sample_df_slice)
         self.assertEqual(spike_duration, 1460)
 
-
     def test_data_collection_frequency_check(self):
         units_pass = [Mock() for _ in range(4)]
         freq_pass = 10.0
@@ -397,10 +432,53 @@ class TestHelperFunctions(unittest.TestCase):
         self.assertEqual(result, 152.0)
 
     def test_insert_metadata_header(self):
-        self.fail("finish testing")
+        metadata_list = [
+            ["usb_logger_id", "ACPL01"],
+            ["usb_logger_serial_number", "000001"],
+            ["file_name", "file_basename"],
+        ]
+        data = [
+            ["row_numb", "date_time", "celsius"],
+            [1, Timestamp("2020-03-16 10:30:00"), 0.0],
+            [2, Timestamp("2020-03-16 10:40:00"), 2.0],
+            [3, Timestamp("2020-03-16 10:50:00"), 3.0],
+            [4, Timestamp("2020-03-16 11:00:00"), 2.0],
+        ]
+        result = insert_metadata_header(data, metadata_list)
+        expected = [
+            ["file_name", "file_basename"],
+            ["usb_logger_serial_number", "000001"],
+            ["usb_logger_id", "ACPL01"],
+            ["row_numb", "date_time", "celsius"],
+            [1, Timestamp("2020-03-16 10:30:00"), 0.0],
+            [2, Timestamp("2020-03-16 10:40:00"), 2.0],
+            [3, Timestamp("2020-03-16 10:50:00"), 3.0],
+            [4, Timestamp("2020-03-16 11:00:00"), 2.0],
+        ]
+        self.assertEqual(result, expected)
 
-    def test_extract_to_dict(self):
-        self.fail("finish testing")
+    def test_extract_to_list(self):
+        df = pd.DataFrame(
+            {
+                "row_numb": [1, 2, 3, 4],
+                "date_time": [
+                    Timestamp("2020-03-16 10:30:00"),
+                    Timestamp("2020-03-16 10:40:00"),
+                    Timestamp("2020-03-16 10:50:00"),
+                    Timestamp("2020-03-16 11:00:00"),
+                ],
+                "celsius": [0.0, 2.0, 3.0, 2.0],
+            }
+        )
+        result = extract_to_list(df)
+        expected = [
+            ["row_numb", "date_time", "celsius"],
+            [1, Timestamp("2020-03-16 10:30:00"), 0.0],
+            [2, Timestamp("2020-03-16 10:40:00"), 2.0],
+            [3, Timestamp("2020-03-16 10:50:00"), 3.0],
+            [4, Timestamp("2020-03-16 11:00:00"), 2.0],
+        ]
+        self.assertEqual(result, expected)
 
     def test_convert_timestamps(self):
         df = pd.DataFrame(
@@ -532,10 +610,6 @@ class TestAnalyticalService(unittest.TestCase):
             )
 
             self.assertEqual(result, ["spikes_prepared_for_reporting"])
-
-        spike_dict = self.analytical_service.analyze_spikes([self.unit])
-        print(spike_dict)
-        self.fail("finish testing")
 
     def test_add_status_column(self):
         sample_df = pd.DataFrame(
@@ -1317,11 +1391,11 @@ class TestXLSXGraph(unittest.TestCase):
                         ["052297777", None, None],
                         ["ACP169 BU_FZ156", None, None],
                         ["row_numb", "date_time", "celsius"],
-                        [1, "2020-03-16 10:30:00", 0.0],
-                        [2, "2020-03-16 10:40:00", 0.5],
-                        [3, "2020-03-16 10:50:00", 1.0],
-                        [4, "2020-03-16 11:00:00", 1.5],
-                        [5, "2020-03-16 11:10:00", 2.0],
+                        [1, datetime.datetime(2020, 3, 16, 10, 30), 0.0],
+                        [2, datetime.datetime(2020, 3, 16, 10, 40), 0.5],
+                        [3, datetime.datetime(2020, 3, 16, 10, 50), 1.0],
+                        [4, datetime.datetime(2020, 3, 16, 11, 00), 1.5],
+                        [5, datetime.datetime(2020, 3, 16, 11, 10), 2.0],
                     ],
                     "data_row_min": 3,
                     "data_row_max": 7,
@@ -1350,11 +1424,11 @@ class TestXLSXGraph(unittest.TestCase):
                         ["052297777", None, None],
                         ["ACP169 BU_FZ156", None, None],
                         ["row_numb", "date_time", "celsius"],
-                        [1, "2020-03-16 10:30:00", 0.0],
-                        [2, "2020-03-16 10:40:00", 0.5],
-                        [3, "2020-03-16 10:50:00", 1.0],
-                        [4, "2020-03-16 11:00:00", 1.5],
-                        [5, "2020-03-16 11:10:00", 2.0],
+                        [1, datetime.datetime(2020, 3, 16, 10, 30), 0.0],
+                        [2, datetime.datetime(2020, 3, 16, 10, 40), 0.5],
+                        [3, datetime.datetime(2020, 3, 16, 10, 50), 1.0],
+                        [4, datetime.datetime(2020, 3, 16, 11, 00), 1.5],
+                        [5, datetime.datetime(2020, 3, 16, 11, 10), 2.0],
                     ],
                     "data_row_min": 3,
                     "data_row_max": 7,
