@@ -11,7 +11,8 @@ logging.basicConfig(
 
 
 def main():
-    file_list = []
+    file = r"/workspaces/usb_logger_parser/ACP169_30-03-2020_artificial_spikes.txt"
+    file_list = [file]
     reporting_service = ReportingService()
     analytical_service = AnalyticalService()
     storage_units = [StorageCondition.create_from_(file) for file in file_list]

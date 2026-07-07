@@ -145,7 +145,8 @@ class XLSXGraph:
                                 data_column,
                                 self.datetime_format,
                             )
-                        self.ws.write(row_idx, self.start_col + column_idx, data_column)
+                        else:
+                            self.ws.write(row_idx, self.start_col + column_idx, data_column)
 
                 self.start_col = self.start_col + data_width + 1
                 data[unit]["y_axis_bounds"] = y_axis_bounds

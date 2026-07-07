@@ -76,6 +76,8 @@ def validate(file):
                 raise ValueError(f"Some values are missing in '{column}' column")
         return file
 
+    except(ValueError, KeyError) as e:
+        raise e from None #re-raising independently so that either error is not caught by 'except Exception as e'
     except FileNotFoundError as e:
         logger.error(f"No file '{file}' found")
         raise e from None
