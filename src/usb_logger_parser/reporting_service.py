@@ -30,7 +30,8 @@ class ReportingService:
         }
 
     def report_spikes(self, spike_info_list):
-        return XlSXSummary(spike_info_list)
+        summary = XLSXSummary(spike_info_list)
+        summary.insert_data()
 
     def report_raw_data(self, storage_units):
         for unit in storage_units:

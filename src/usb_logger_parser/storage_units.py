@@ -245,8 +245,8 @@ class LimitValues:
 
 
 class Limits:
-    fridge = LimitValues(2.0, 8.0, 0.0, 15.0, 3600, 10800)
-    freezer = LimitValues(-25.0, -15.0, -30.0, -0.1, 3600, 10800)
-    cold_storage = LimitValues(-10.0, 10.0, -20.0, 20.0, 3600, 10800)
-    storage_25c = LimitValues(24.0, 26.0, 15.0, 30.0, 900, 10800)
-    storage_50c = LimitValues(45.0, 55.0, 25.0, 60.0, 900, 10800)
+    fridge = LimitValues(2.0, 8.0, 0.0, 15.0, 60, 180)
+    freezer = LimitValues(-25.0, -15.0, -30.0, -0.1, 60, 180)
+    cold_storage = LimitValues(-10.0, 10.0, -20.0, 20.0, 60, 180)
+    storage_25c = LimitValues(24.0, 26.0, 15.0, 30.0, 15, 180)
+    storage_50c = LimitValues(45.0, 55.0, 25.0, 60.0, 15, 180)

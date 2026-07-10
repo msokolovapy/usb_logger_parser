@@ -76,7 +76,7 @@ class AnalyticalService:
         return filtered_df
 
     def add_last_spike_check(self, df_filtered):
-        """returns dataframe where last spike of the day is defined as True if"""
+        """returns dataframe where last spike of the day is defined as True"""
         df_filtered["last_spike_of_day"] = df_filtered[
             "date_time"
         ].dt.date != df_filtered["date_time"].dt.date.shift(-1)
@@ -106,7 +106,6 @@ class AnalyticalService:
         filtered = temp_data.loc[mask].copy()
         if filtered.empty:
             return 0
-
         return filtered["reading_gap_mins"].sum()
 
     def determine_spike_duration_24hr_mins(self, df_last_spike, df_original):
@@ -188,6 +187,8 @@ class AnalyticalService:
 
 
     def prepare_spike_summary_for_reporting(self, df_excursions, metadata):
+        df_excursions["mkt"] = df_excursions["mkt"].fillna("Not applicable")
+        df_excursions['spike_duration_24hr_mins'] = df_excursions['spike_duration_24hr_mins'].fillna("Not applicable")
         data = extract_to_list(df_excursions)
         data_with_header = insert_metadata_header(data, metadata)
         return data_with_header

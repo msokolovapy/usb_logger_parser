@@ -194,7 +194,7 @@ class TestColdChainUnit(unittest.TestCase):
             self.assertIsNotNone(unit)
             self.assertEqual(unit.low_alarm, 45.0)
             self.assertEqual(unit.high_alarm, 55.0)
-            self.assertEqual(unit.spike_duration, 900)
+            self.assertEqual(unit.spike_duration, 15)
             self.assertEqual(unit.logger.id, "ACPL01")
             self.assertEqual(unit.logger.serial_numb, "000001")
             self.assertEqual(unit.file_basename, "file_basename")
@@ -1159,13 +1159,14 @@ class TestAnalyticalService(unittest.TestCase):
                 "src.usb_logger_parser.analytical_service.insert_metadata_header"
             ) as mock_insert_metadata_header,
         ):
+            df_excursions = MagicMock()
             mock_extract_to_list.return_value = "data_extracted"
             mock_insert_metadata_header.return_value = "data_with_header"
             result = self.analytical_service.prepare_spike_summary_for_reporting(
-                "df_excursions", "usb_logger_metadata"
+                df_excursions, "usb_logger_metadata"
             )
 
-            mock_extract_to_list.assert_called_with("df_excursions")
+            mock_extract_to_list.assert_called_with(df_excursions)
             mock_insert_metadata_header.assert_called_with(
                 "data_extracted", "usb_logger_metadata"
             )
@@ -1280,54 +1281,54 @@ class TestXLSXSummary(unittest.TestCase):
         self.assertIsNotNone(result.ws)
         self.assertEqual(result.file_name, f"{today}_spikes_summary")
 
-    # def test_insert_data(self):
-    #     sample_spikes_list = [
-    #         (
-    #             ("file_name", "dummy.txt"),
-    #             ("usb_serial_number", "052297777"),
-    #             ("usb_logger_id", "ACP169 BU_FZ156"),
-    #             (
-    #                 "cumulat_spike_id",
-    #                 "extreme_temp",
-    #                 "spike_date",
-    #                 "extreme_date_time",
-    #                 "spike_duration_mins",
-    #                 "spike_duration_24hr_mins",
-    #             ),
-    #             (
-    #                 1,
-    #                 20.0,
-    #                 datetime.date(2020, 3, 15),
-    #                 datetime.datetime(2020, 3, 15, 10, 30),
-    #                 20,
-    #                 20.0,
-    #             ),
-    #         ),
-    #         (
-    #             ("file_name", "dummy_2.txt"),
-    #             ("usb_serial_number", "064297777"),
-    #             ("usb_logger_id", "ACP226"),
-    #             (
-    #                 "cumulat_spike_id",
-    #                 "extreme_temp",
-    #                 "spike_date",
-    #                 "extreme_date_time",
-    #                 "spike_duration_mins",
-    #                 "spike_duration_24hr_mins",
-    #             ),
-    #             (
-    #                 1,
-    #                 1.5,
-    #                 datetime.date(2020, 3, 16),
-    #                 datetime.datetime(2020, 3, 16, 11, 10),
-    #                 30,
-    #                 30.0,
-    #             ),
-    #         ),
-    #     ]
+    def test_insert_data(self):
+        sample_spikes_list = [
+            (
+                ("file_name", "dummy.txt"),
+                ("usb_serial_number", "052297777"),
+                ("usb_logger_id", "ACP169 BU_FZ156"),
+                (
+                    "cumulat_spike_id",
+                    "extreme_temp",
+                    "spike_date",
+                    "extreme_date_time",
+                    "spike_duration_mins",
+                    "spike_duration_24hr_mins",
+                ),
+                (
+                    1,
+                    20.0,
+                    datetime.date(2020, 3, 15),
+                    datetime.datetime(2020, 3, 15, 10, 30),
+                    20,
+                    20.0,
+                ),
+            ),
+            (
+                ("file_name", "dummy_2.txt"),
+                ("usb_serial_number", "064297777"),
+                ("usb_logger_id", "ACP226"),
+                (
+                    "cumulat_spike_id",
+                    "extreme_temp",
+                    "spike_date",
+                    "extreme_date_time",
+                    "spike_duration_mins",
+                    "spike_duration_24hr_mins",
+                ),
+                (
+                    1,
+                    1.5,
+                    datetime.date(2020, 3, 16),
+                    datetime.datetime(2020, 3, 16, 11, 10),
+                    30,
+                    30.0,
+                ),
+            ),
+        ]
 
-    #     xlsx_summary = XLSXSummary(sample_spikes_list)
-    #     xlsx_summary.insert_data()
+        xlsx_summary = XLSXSummary(sample_spikes_list)
+        xlsx_summary.insert_data()
 
 
 class TestXLSXGraph(unittest.TestCase):
@@ -1365,62 +1366,62 @@ class TestXLSXGraph(unittest.TestCase):
         self.assertIsInstance(result.wb, Workbook)
         self.assertIsNotNone(result.ws)
 
-    # def test_insert_data(self):
-    #     data = [
-    #         {
-    #             self.unit: {
-    #                 "data": [
-    #                     ["052297777", None, None],
-    #                     ["ACP169 BU_FZ156", None, None],
-    #                     ["row_numb", "date_time", "celsius"],
-    #                     [1, datetime.datetime(2020, 3, 16, 10, 30), 0.0],
-    #                     [2, datetime.datetime(2020, 3, 16, 10, 40), 0.5],
-    #                     [3, datetime.datetime(2020, 3, 16, 10, 50), 1.0],
-    #                     [4, datetime.datetime(2020, 3, 16, 11, 00), 1.5],
-    #                     [5, datetime.datetime(2020, 3, 16, 11, 10), 2.0],
-    #                 ],
-    #                 "data_row_min": 3,
-    #                 "data_row_max": 7,
-    #                 "data_width": 3,
-    #             }
-    #         }
-    #     ]
-    #     xlsxgraph = XLSXGraph(data)
-    #     xlsxgraph.insert_data()
-    #     self.assertEqual(
-    #         xlsxgraph.x_axis_bounds,
-    #         {"col_min": 10, "col_max": 10, "row_min": 3, "row_max": 7},
-    #     )
-    #     (data,) = xlsxgraph.data_to_graph
-    #     self.assertEqual(
-    #         data[self.unit]["y_axis_bounds"],
-    #         {"col_min": 12, "col_max": 12, "row_min": 3, "row_max": 7},
-    #     )
-    #     self.assertEqual(xlsxgraph.start_col, 14)
+    def test_insert_data(self):
+        data = [
+            {
+                self.unit: {
+                    "data": [
+                        ["052297777", None, None],
+                        ["ACP169 BU_FZ156", None, None],
+                        ["row_numb", "date_time", "celsius"],
+                        [1, datetime.datetime(2020, 3, 16, 10, 30), 0.0],
+                        [2, datetime.datetime(2020, 3, 16, 10, 40), 0.5],
+                        [3, datetime.datetime(2020, 3, 16, 10, 50), 1.0],
+                        [4, datetime.datetime(2020, 3, 16, 11, 00), 1.5],
+                        [5, datetime.datetime(2020, 3, 16, 11, 10), 2.0],
+                    ],
+                    "data_row_min": 3,
+                    "data_row_max": 7,
+                    "data_width": 3,
+                }
+            }
+        ]
+        xlsxgraph = XLSXGraph(data)
+        xlsxgraph.insert_data()
+        self.assertEqual(
+            xlsxgraph.x_axis_bounds,
+            {"col_min": 10, "col_max": 10, "row_min": 3, "row_max": 7},
+        )
+        (data,) = xlsxgraph.data_to_graph
+        self.assertEqual(
+            data[self.unit]["y_axis_bounds"],
+            {"col_min": 12, "col_max": 12, "row_min": 3, "row_max": 7},
+        )
+        self.assertEqual(xlsxgraph.start_col, 14)
 
-    # def test_insert_chart(self):
-    #     data = [
-    #         {
-    #             self.unit: {
-    #                 "data": [
-    #                     ["052297777", None, None],
-    #                     ["ACP169 BU_FZ156", None, None],
-    #                     ["row_numb", "date_time", "celsius"],
-    #                     [1, datetime.datetime(2020, 3, 16, 10, 30), 0.0],
-    #                     [2, datetime.datetime(2020, 3, 16, 10, 40), 0.5],
-    #                     [3, datetime.datetime(2020, 3, 16, 10, 50), 1.0],
-    #                     [4, datetime.datetime(2020, 3, 16, 11, 00), 1.5],
-    #                     [5, datetime.datetime(2020, 3, 16, 11, 10), 2.0],
-    #                 ],
-    #                 "data_row_min": 3,
-    #                 "data_row_max": 7,
-    #                 "data_width": 3,
-    #             }
-    #         }
-    #     ]
-    #     xlsxgraph = XLSXGraph(data)
-    #     xlsxgraph.insert_data()
-    #     xlsxgraph.insert_chart()
+    def test_insert_chart(self):
+        data = [
+            {
+                self.unit: {
+                    "data": [
+                        ["052297777", None, None],
+                        ["ACP169 BU_FZ156", None, None],
+                        ["row_numb", "date_time", "celsius"],
+                        [1, datetime.datetime(2020, 3, 16, 10, 30), 0.0],
+                        [2, datetime.datetime(2020, 3, 16, 10, 40), 0.5],
+                        [3, datetime.datetime(2020, 3, 16, 10, 50), 1.0],
+                        [4, datetime.datetime(2020, 3, 16, 11, 00), 1.5],
+                        [5, datetime.datetime(2020, 3, 16, 11, 10), 2.0],
+                    ],
+                    "data_row_min": 3,
+                    "data_row_max": 7,
+                    "data_width": 3,
+                }
+            }
+        ]
+        xlsxgraph = XLSXGraph(data)
+        xlsxgraph.insert_data()
+        xlsxgraph.insert_chart()
 
 
 if __name__ == "__main__":
