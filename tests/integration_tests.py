@@ -1,4 +1,5 @@
 import unittest
+from datetime import datetime
 
 from src.usb_logger_parser.storage_units import StorageCondition, Freezer
 from src.usb_logger_parser.analytical_service import AnalyticalService
@@ -28,7 +29,8 @@ class TestColdStorageUnit(unittest.TestCase):
 
 class TestReportRawData(unittest.TestCase):
     def test_report_raw_data(self):
-        reporting_service = ReportingService()
+        today = datetime.now().strftime("%Y-%m-%d")
+        reporting_service = ReportingService(f"{today}_integration_tests_graph")
         file_list = [
             r"/workspaces/usb_logger_parser/ACP169_30-03-2020_artificial_spikes.txt"
         ]
@@ -39,8 +41,11 @@ class TestReportRawData(unittest.TestCase):
 
 class TestReportSpikes(unittest.TestCase):
     def test_report_spikes(self):
+        today = datetime.now().strftime("%Y-%m-%d")
         analytical_service = AnalyticalService()
-        reporting_service = ReportingService()
+        reporting_service = ReportingService(
+            f"{today}_integration_tests_spikes_summary"
+        )
         file_list = [
             r"/workspaces/usb_logger_parser/ACP169_30-03-2020_artificial_spikes.txt"
         ]

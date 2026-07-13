@@ -1264,15 +1264,22 @@ class TestReportingService(unittest.TestCase):
             )
             self.assertEqual(result, expected_result)
 
-        def test_report_spikes(self):
-            self.fail("finish testing")
+    def test_report_spikes(self):
+        with patch(
+            "src.usb_logger_parser.reporting_service.XLSXSummary"
+        ) as mock_xlsx_summary:
+
+            self.reporting_service.report_spikes("spike_info_list")
+
+            mock_xlsx_summary.assert_called_with("spike_info_list", None)
+            mock_xlsx_summary.return_value.insert_data.assert_called()
 
 
 class TestXLSXSummary(unittest.TestCase):
     def test_xlsx_summary_init(self):
         spikes_list = []
         today = datetime.datetime.now().strftime("%Y-%m-%d")
-        
+
         result = XLSXSummary(spikes_list)
 
         self.assertIsNotNone(result)
@@ -1326,8 +1333,9 @@ class TestXLSXSummary(unittest.TestCase):
                 ),
             ),
         ]
-
-        xlsx_summary = XLSXSummary(sample_spikes_list)
+        today = datetime.datetime.now().strftime("%Y-%m-%d")
+        output_path = f"{today}_unittests_spikes_summary"
+        xlsx_summary = XLSXSummary(sample_spikes_list, output_path)
         xlsx_summary.insert_data()
 
 
@@ -1335,7 +1343,7 @@ class TestXLSXGraph(unittest.TestCase):
     def setUp(self):
         self.reporting_service = ReportingService()
         self.unit = Fridge(
-            df_temp_data = 'df_temp_data',
+            df_temp_data="df_temp_data",
             logger_id="ACP169 BU_FZ156",
             serial_numb="052297777",
             ave_data_coll_freq=152.0,
@@ -1419,7 +1427,9 @@ class TestXLSXGraph(unittest.TestCase):
                 }
             }
         ]
-        xlsxgraph = XLSXGraph(data)
+        today = datetime.datetime.now().strftime("%Y-%m-%d")
+        output_path = f"{today}_unittests_graph"
+        xlsxgraph = XLSXGraph(data, output_path)
         xlsxgraph.insert_data()
         xlsxgraph.insert_chart()
 

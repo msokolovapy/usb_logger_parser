@@ -26,10 +26,11 @@ from usb_logger_parser.analytical_service import AnalyticalService
 from usb_logger_parser.reporting_service import ReportingService
 from usb_logger_parser.storage_units import StorageCondition
 
-file_list = []
+file = r"/workspaces/usb_logger_parser/ACP169_30-03-2020_artificial_spikes.txt"
+file_list = [file]
 reporting_service = ReportingService()
 analytical_service = AnalyticalService()
-storage_units = [StorageCondition.create_from_(file) for file in files]
+storage_units = [StorageCondition.create_from_(file) for file in file_list]
 temp_spikes = analytical_service.analyze_spikes(storage_units)
 reporting_service.report_spikes(temp_spikes)
 reporting_service.report_raw_data(storage_units)
@@ -52,6 +53,7 @@ Custom profiles can be defined using `LimitValues`. Defaults reflect typical col
 ```
 usb_logger_parser/
 ├── README.md
+├── ACP169_30-03-2020_artificial_spikes.txt
 ├── LICENSE
 ├── pyproject.toml
 ├── usb_logger_parser/
@@ -64,6 +66,7 @@ usb_logger_parser/
 │   
 └── tests/
     └── unittests.py
+    └── integration_tests.py
 
 ## 📝 Notes
 

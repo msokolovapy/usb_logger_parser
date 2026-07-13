@@ -110,6 +110,8 @@ def convert_timestamps(df):
     for col in df.columns:
         if pd.api.types.is_datetime64_any_dtype(df[col]):
             df[col] = pd.to_datetime(df[col]).dt.to_pydatetime()
+        if col == 'spike_date':
+            df[col] = pd.to_datetime(df[col]).dt.date
     return df
 
 def data_collection_frequency_check(storage_units):
@@ -147,3 +149,5 @@ def extract_to_list(df):
     column_names = df.columns.tolist() 
     values.insert(0, column_names) # to obtain data as a list of lists for easy writing to xlsx workbook later
     return values
+
+

@@ -8,8 +8,9 @@ logger = logging.getLogger(__name__)
 
 
 class ReportingService:
-    def __init__(self):
+    def __init__(self, output_path = None):
         self.data_to_graph = []
+        self.output_path = output_path
 
     def prepare_data_for_reporting(self, unit):
         data = extract_to_list(unit.temp_data)
@@ -30,7 +31,7 @@ class ReportingService:
         }
 
     def report_spikes(self, spike_info_list):
-        summary = XLSXSummary(spike_info_list)
+        summary = XLSXSummary(spike_info_list, self.output_path)
         summary.insert_data()
 
     def report_raw_data(self, storage_units):
@@ -44,18 +45,18 @@ class ReportingService:
                 )
             prepared_data = self.prepare_data_for_reporting(unit)
             self.data_to_graph.append(prepared_data)
-        xlsxgraph = XLSXGraph(self.data_to_graph)
+        xlsxgraph = XLSXGraph(self.data_to_graph, self.output_path)
         xlsxgraph.insert_data()
         xlsxgraph.insert_chart()
 
 
 class XLSXSummary:
-    def __init__(self, spikes_list):
+    def __init__(self, spikes_list, output_path = None):
         self.spikes_list = spikes_list
-        self.file_name = self.get_file_name()
+        self.file_name = output_path or self.get_file_name()
         self.wb = Workbook(f"{self.file_name}.xlsx")
         self.ws = self.wb.add_worksheet(
-            self.file_name
+            'spikes_summary'
         )  # keeping worksheet as attribute as xlsxwriter cannot re-open worksheets
         self.datetime_format = self.wb.add_format(
             {"num_format": "dd/mm/yyyy hh:mm:ss"}
@@ -88,7 +89,7 @@ class XLSXSummary:
 
 
 class XLSXGraph:
-    def __init__(self, data_to_graph):
+    def __init__(self, data_to_graph, output_path = None):
         self.data_to_graph = data_to_graph
         self.start_col = 10
         self.x_axis_bounds = {
@@ -97,10 +98,10 @@ class XLSXGraph:
             "row_min": 0,
             "row_max": 0,
         }
-        self.file_name = self.get_file_name()
+        self.file_name = output_path or self.get_file_name()
         self.wb = Workbook(f"{self.file_name}.xlsx")
         self.ws = self.wb.add_worksheet(
-            f"{self.file_name}"
+            "graph"
         )  # keeping worksheet as attribute as xlsxwriter cannot re-open worksheets
         self.datetime_format = self.wb.add_format(
             {"num_format": "dd/mm/yyyy hh:mm:ss"}
@@ -166,14 +167,14 @@ class XLSXGraph:
                     {
                         "name": unit.logger.id,
                         "categories": [
-                            self.file_name,
+                            'graph',
                             self.x_axis_bounds["row_min"],
                             self.x_axis_bounds["col_min"],
                             self.x_axis_bounds["row_max"],
                             self.x_axis_bounds["col_max"],
                         ],
                         "values": [
-                            self.file_name,
+                            'graph',
                             y_axis_bounds["row_min"],
                             y_axis_bounds["col_min"],
                             y_axis_bounds["row_max"],
