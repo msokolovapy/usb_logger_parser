@@ -20,6 +20,7 @@ from src.usb_logger_parser.helper_functions import (
     get_ave_data_coll_freq,
     extract_to_list,
     insert_metadata_header,
+    get_files
 )
 from src.usb_logger_parser.storage_units import (
     StorageCondition,
@@ -509,6 +510,40 @@ class TestHelperFunctions(unittest.TestCase):
             ],
         }
         self.assertEqual(expected, result.to_dict("list"))
+
+    def test_get_files(self):
+        with patch(
+            "src.usb_logger_parser.helper_functions.files"
+        ) as mock_importlib_files:
+            with self.subTest("importlib unexpected error"):
+                mock_importlib_files.return_value = None
+                with self.assertRaises(Exception) as ctx:
+                    get_files("usb_logger_parser", "resources")
+                self.assertIn( "Unexpected error when trying to access usb_logger_parser.resources",str(ctx.exception))
+                mock_importlib_files.reset_mock(return_value=True)
+
+            with self.subTest("importlib ValueError"):
+                with self.assertRaises(ValueError) as ctx:
+                    get_files("dummy_1", "dummy_2")
+                self.assertIn(
+                        'No raw temperature data files found in "dummy_2" directory',
+                        str(ctx.exception),
+                    )
+                mock_importlib_files.reset_mock()
+
+            with self.subTest("importlib works fine"):
+                mock_file = Mock()
+                mock_file.is_file.return_value = True
+                mock_importlib_files.return_value.joinpath.return_value.iterdir.return_value = iter(
+                    [mock_file]
+                )
+                file = get_files("usb_logger_parser", "resources")
+
+                mock_importlib_files.assert_called_with("usb_logger_parser")
+                mock_importlib_files.return_value.joinpath.assert_called_with(
+                    "resources"
+                )
+                self.assertEqual(file, [mock_file])
 
 
 class TestAnalyticalServiceInit(unittest.TestCase):

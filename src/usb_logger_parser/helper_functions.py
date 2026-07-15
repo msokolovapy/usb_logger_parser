@@ -3,6 +3,7 @@ import os
 import sys
 import logging
 from collections import Counter
+from importlib.resources import files
 
 logger = logging.getLogger(__name__)
 
@@ -151,3 +152,19 @@ def extract_to_list(df):
     return values
 
 
+def get_files(package,folder):
+    found_files = []
+    try:
+        resource_dir = files(package).joinpath(folder)
+        for entry in resource_dir.iterdir():
+            if entry.is_file():
+                found_files.append(entry)
+        if len(found_files) == 0:
+            logger.warning(f'No raw temperature data files found in "{folder}" directory')
+            raise ValueError(f'No raw temperature data files found in "{folder}" directory')
+    except ValueError:
+        raise
+    except Exception:
+        logger.error(f'Unexpected error when trying to access {package}.{folder}')
+        raise ValueError(f'Unexpected error when trying to access {package}.{folder}')
+    return found_files
