@@ -20,7 +20,7 @@ from src.usb_logger_parser.helper_functions import (
     get_ave_data_coll_freq,
     extract_to_list,
     insert_metadata_header,
-    get_files
+    get_files,
 )
 from src.usb_logger_parser.storage_units import (
     StorageCondition,
@@ -241,10 +241,6 @@ class TestHelperFunctions(unittest.TestCase):
         self.assertEqual(storage_condit.high_alert, 15.0)
 
     def test_validate(self):
-        with self.subTest("file not found"):
-            with self.assertRaises(FileNotFoundError):
-                validate("dummy.txt")
-
         test_cases = [
             (
                 "empty_dataframe",
@@ -268,7 +264,7 @@ class TestHelperFunctions(unittest.TestCase):
 
         for test, mock_return_value, error, error_message in test_cases:
             with self.subTest(test):
-                with patch(f"{__name__}.pd.read_csv") as mock_read_csv:
+                with patch("src.usb_logger_parser.helper_functions.pd.read_csv") as mock_read_csv:
                     mock_read_csv.return_value = mock_return_value
                     with self.assertRaises(error) as context:
                         validate("dummy.txt")
@@ -323,26 +319,31 @@ class TestHelperFunctions(unittest.TestCase):
         with self.subTest("parsing serial number"):
             self.assertEqual(serial_numb, "0000123")
 
-    @patch("os.path.basename")
-    @patch(f"{__name__}.validate")
-    @patch(f"{__name__}.pd.read_csv")
-    def test_read(self, mock_read_csv, mock_valid_data, mock_basename):
-        mock_valid_data.return_value = "dummy.txt"
-        mock_read_csv.return_value = pd.DataFrame(self.df_temp_data)
-        mock_basename.return_value = self.file_basename
-        expected_column_names = [
-            "row_numb",
-            "date_time",
-            "celsius",
-            "high_alarm",
-            "low_alarm",
-        ]
+    def test_read(self):
+        with (
+            patch("src.usb_logger_parser.helper_functions.validate") as mock_valid_data,
+            patch("src.usb_logger_parser.helper_functions.pd.read_csv") as mock_pd_read_csv,
+            patch("src.usb_logger_parser.helper_functions.parse_") as mock_parse,
+        ):
+            mock_traversable_obj = MagicMock()
+            mock_traversable_obj.name = self.file_basename
+            mock_traversable_obj.open.return_value.__enter__.return_value = 'file'
+            mock_valid_data.return_value = "valid_file"
+            mock_pd_read_csv.return_value = "df"
+            mock_parse.return_value = ("df", "ACP169 BU_FZ156", "052297777")
 
-        df_temp_data, logger_id, serial_numb, file_basename = read("dummy.txt")
+            df_temp_data, logger_id, serial_numb, file_basename = read(
+                mock_traversable_obj
+            )
 
-        self.assertEqual(logger_id, "ACP169 BU_FZ156")
-        self.assertEqual(serial_numb, "052297777")
-        self.assertEqual(list(df_temp_data.columns), expected_column_names)
+            mock_valid_data.assert_called_with('file')
+            self.assertEqual(mock_pd_read_csv.call_args[0][0], 'valid_file')
+            mock_parse.assert_called_with("df")
+            self.assertEqual(df_temp_data, "df")
+            self.assertEqual(logger_id, "ACP169 BU_FZ156")
+            self.assertEqual(serial_numb, "052297777")
+            self.assertEqual(file_basename, self.file_basename)
+
 
     def test_get_extreme_temp(self):
         sample_df_slice = pd.DataFrame({"celsius": [-25.0, -26.0, -24.0, -23.0]})
@@ -519,16 +520,19 @@ class TestHelperFunctions(unittest.TestCase):
                 mock_importlib_files.return_value = None
                 with self.assertRaises(Exception) as ctx:
                     get_files("usb_logger_parser", "resources")
-                self.assertIn( "Unexpected error when trying to access usb_logger_parser.resources",str(ctx.exception))
+                self.assertIn(
+                    "Unexpected error when trying to access usb_logger_parser.resources",
+                    str(ctx.exception),
+                )
                 mock_importlib_files.reset_mock(return_value=True)
 
             with self.subTest("importlib ValueError"):
                 with self.assertRaises(ValueError) as ctx:
                     get_files("dummy_1", "dummy_2")
                 self.assertIn(
-                        'No raw temperature data files found in "dummy_2" directory',
-                        str(ctx.exception),
-                    )
+                    'No raw temperature data files found in "dummy_2" directory',
+                    str(ctx.exception),
+                )
                 mock_importlib_files.reset_mock()
 
             with self.subTest("importlib works fine"):
