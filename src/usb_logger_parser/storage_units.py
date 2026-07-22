@@ -19,7 +19,7 @@ class StorageCondition:
             <= Limits.cold_storage.high_alarm
         ):
             while True:
-                user_input = get_user_confirmation()
+                user_input = get_user_confirmation(file_basename, logger_id).upper()
                 if user_input == "FG":
                     return Fridge(
                         df_temp_data,

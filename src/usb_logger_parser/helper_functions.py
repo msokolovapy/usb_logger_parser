@@ -51,12 +51,9 @@ def parse_(df):
     return df, logger_id, serial_numb
 
 
-def get_user_confirmation():
+def get_user_confirmation(file_basename, logger_id):
     user_input = input(
-        "It looks like your temperature trace '{file_basename}' for logger {logger_id}\
-						may have come from either cold storage or fridge.\
-						Please confirm here (FG/CS):"
-    )
+        f"It looks like your temperature trace '{file_basename}' for logger {logger_id} may have come from either cold storage or fridge.Please confirm here (FG/CS):")
     return user_input
 
 
@@ -67,8 +64,8 @@ def validate(file):
             logger.warning(f"Empty dataframe when trying to load {file}")
             raise ValueError(f"Empty dataframe when trying to load {file}")
 
-        required_columns = ["Time", "Celsius(°C)"]
-        missing_columns = set(required_columns) - set(df.columns)
+        required_columns = ["Time", "Celsius"]
+        missing_columns = missing_column_check(df.columns, required_columns)
         if missing_columns:
             logger.warning(f"Some columns are missing: {(', ').join(missing_columns)}")
             raise KeyError(f"Some columns are missing: {(', ').join(missing_columns)}")
@@ -79,7 +76,6 @@ def validate(file):
                 raise ValueError(f"Some values are missing in '{column}' column")
         file.seek(0)
         return file
-
     except (ValueError, KeyError) as e:
         raise e from None  # re-raising independently so that either error is not caught by 'except Exception as e'
     except Exception as e:
@@ -174,3 +170,24 @@ def get_files(package, folder):
         logger.error(f"Unexpected error when trying to access {package}.{folder}")
         raise ValueError(f"Unexpected error when trying to access {package}.{folder}")
     return found_files
+
+
+def missing_column_check(columns, required_cols):
+    """Check whether required columns ('time', 'celsius') are present among the given column names 
+    while avoiding direct comparison of strings to each other due to mangled encoding around the degree symbol.
+    """
+    missing_cols = []
+    try:
+        required_cols_lower = [req_col.lower() for req_col in required_cols]
+        columns_lower = [col.lower() for col in columns]
+    except AttributeError:
+        logger.warning('Failed to convert column names to lower-case')
+        raise AttributeError('Failed to convert column names to lower-case')
+    except Exception:
+        logger.warning('Unknown error when trying to convert column names to lower-case')
+        raise AttributeError('Unknown error when trying to convert column names to lower-case')
+    for req in required_cols_lower:
+        if req not in "".join(columns_lower): #create mega-string of all column names to quickly check if required column is present
+            missing_cols.append(req.capitalize())
+    return missing_cols
+

@@ -21,6 +21,7 @@ from src.usb_logger_parser.helper_functions import (
     extract_to_list,
     insert_metadata_header,
     get_files,
+    missing_column_check,
 )
 from src.usb_logger_parser.storage_units import (
     StorageCondition,
@@ -264,7 +265,9 @@ class TestHelperFunctions(unittest.TestCase):
 
         for test, mock_return_value, error, error_message in test_cases:
             with self.subTest(test):
-                with patch("src.usb_logger_parser.helper_functions.pd.read_csv") as mock_read_csv:
+                with patch(
+                    "src.usb_logger_parser.helper_functions.pd.read_csv"
+                ) as mock_read_csv:
                     mock_read_csv.return_value = mock_return_value
                     with self.assertRaises(error) as context:
                         validate("dummy.txt")
@@ -322,12 +325,14 @@ class TestHelperFunctions(unittest.TestCase):
     def test_read(self):
         with (
             patch("src.usb_logger_parser.helper_functions.validate") as mock_valid_data,
-            patch("src.usb_logger_parser.helper_functions.pd.read_csv") as mock_pd_read_csv,
+            patch(
+                "src.usb_logger_parser.helper_functions.pd.read_csv"
+            ) as mock_pd_read_csv,
             patch("src.usb_logger_parser.helper_functions.parse_") as mock_parse,
         ):
             mock_traversable_obj = MagicMock()
             mock_traversable_obj.name = self.file_basename
-            mock_traversable_obj.open.return_value.__enter__.return_value = 'file'
+            mock_traversable_obj.open.return_value.__enter__.return_value = "file"
             mock_valid_data.return_value = "valid_file"
             mock_pd_read_csv.return_value = "df"
             mock_parse.return_value = ("df", "ACP169 BU_FZ156", "052297777")
@@ -336,14 +341,13 @@ class TestHelperFunctions(unittest.TestCase):
                 mock_traversable_obj
             )
 
-            mock_valid_data.assert_called_with('file')
-            self.assertEqual(mock_pd_read_csv.call_args[0][0], 'valid_file')
+            mock_valid_data.assert_called_with("file")
+            self.assertEqual(mock_pd_read_csv.call_args[0][0], "valid_file")
             mock_parse.assert_called_with("df")
             self.assertEqual(df_temp_data, "df")
             self.assertEqual(logger_id, "ACP169 BU_FZ156")
             self.assertEqual(serial_numb, "052297777")
             self.assertEqual(file_basename, self.file_basename)
-
 
     def test_get_extreme_temp(self):
         sample_df_slice = pd.DataFrame({"celsius": [-25.0, -26.0, -24.0, -23.0]})
@@ -548,6 +552,36 @@ class TestHelperFunctions(unittest.TestCase):
                     "resources"
                 )
                 self.assertEqual(file, [mock_file])
+
+    def test_missing_column_check(self):
+        test_cases = [
+            (
+                "missing column check pass",
+                ["ACPL211 StbFG", "Time", "Celsius(ï¿½C)", "Serial Number"],
+                [],
+            ),
+            (
+                "missing column check fail",
+                ["ACPL211 StbFG", "Serial Number"],
+                ["Time", "Celsius"],
+            ),
+        ]
+        required_cols = ["Time", "Celsius"]
+
+        for test_name, case, expected in test_cases:
+            with self.subTest(test_name):
+                result = missing_column_check(case, required_cols)
+                self.assertEqual(result, expected)
+        with self.subTest('missing column check - raising AttributeError'):
+            with self.assertRaises(AttributeError) as context:
+                result = missing_column_check([1,2,3,4], required_cols)
+            self.assertIn('Failed to convert column names to lower-case', str(context.exception))
+        with self.subTest('missing column check - raising general Exception'):
+            with self.assertRaises(Exception) as context:
+                bad_result = Mock()
+                bad_result.lower.side_effect = RuntimeError()
+                result = missing_column_check([bad_result], required_cols)
+            self.assertIn('Unknown error when trying to convert column names to lower-case', str(context.exception))       
 
 
 class TestAnalyticalServiceInit(unittest.TestCase):
