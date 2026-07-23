@@ -10,7 +10,7 @@ from src.usb_logger_parser.helper_functions import (
     read,
     parse_,
     get_user_confirmation,
-    validate,
+    validate_and_convert,
     get_average_temp,
     get_extreme_date_time,
     get_extreme_temp,
@@ -241,7 +241,7 @@ class TestHelperFunctions(unittest.TestCase):
         self.assertIsNotNone(storage_condit)
         self.assertEqual(storage_condit.high_alert, 15.0)
 
-    def test_validate(self):
+    def test_validate_and_convert(self):
         test_cases = [
             (
                 "empty_dataframe",
@@ -324,26 +324,21 @@ class TestHelperFunctions(unittest.TestCase):
 
     def test_read(self):
         with (
-            patch("src.usb_logger_parser.helper_functions.validate") as mock_valid_data,
-            patch(
-                "src.usb_logger_parser.helper_functions.pd.read_csv"
-            ) as mock_pd_read_csv,
+            patch("src.usb_logger_parser.helper_functions.validate_and_convert") as mock_valid_df,
             patch("src.usb_logger_parser.helper_functions.parse_") as mock_parse,
         ):
             mock_traversable_obj = MagicMock()
             mock_traversable_obj.name = self.file_basename
             mock_traversable_obj.open.return_value.__enter__.return_value = "file"
-            mock_valid_data.return_value = "valid_file"
-            mock_pd_read_csv.return_value = "df"
+            mock_valid_df.return_value = "valid_dataframe"
             mock_parse.return_value = ("df", "ACP169 BU_FZ156", "052297777")
 
             df_temp_data, logger_id, serial_numb, file_basename = read(
                 mock_traversable_obj
             )
 
-            mock_valid_data.assert_called_with("file")
-            self.assertEqual(mock_pd_read_csv.call_args[0][0], "valid_file")
-            mock_parse.assert_called_with("df")
+            mock_valid_df.assert_called_with("file")
+            mock_parse.assert_called_with("valid_dataframe")
             self.assertEqual(df_temp_data, "df")
             self.assertEqual(logger_id, "ACP169 BU_FZ156")
             self.assertEqual(serial_numb, "052297777")

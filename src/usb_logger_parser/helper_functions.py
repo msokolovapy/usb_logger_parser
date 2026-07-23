@@ -8,22 +8,31 @@ from importlib.resources import files
 logger = logging.getLogger(__name__)
 
 
+# def read(traversable_object):
+#     """Reads a CSV file from an importlib.resources Traversable object and returns pandas DataFrame together with some metadata"""
+#     with traversable_object.open("rb") as file:
+#         valid_file = validate(file)
+#         df = pd.read_csv(
+#             valid_file,
+#             encoding="latin-1",
+#             dtype={
+#                 "Serial Number": str,
+#                 "Celsius(°C)": float,
+#                 "High Alarm": float,
+#                 "Low Alarm": float,
+#             },
+#             converters={"Time": pd.to_datetime},
+#         )
+#     df_temp_data, logger_id, serial_numb = parse_(df)
+#     file_basename = traversable_object.name
+#     return df_temp_data, logger_id, serial_numb, file_basename
+
+
 def read(traversable_object):
     """Reads a CSV file from an importlib.resources Traversable object and returns pandas DataFrame together with some metadata"""
     with traversable_object.open("rb") as file:
-        valid_file = validate(file)
-        df = pd.read_csv(
-            valid_file,
-            encoding="latin-1",
-            dtype={
-                "Serial Number": str,
-                "Celsius(°C)": float,
-                "High Alarm": float,
-                "Low Alarm": float,
-            },
-            converters={"Time": pd.to_datetime},
-        )
-    df_temp_data, logger_id, serial_numb = parse_(df)
+        valid_df = validate_and_convert(file)
+    df_temp_data, logger_id, serial_numb = parse_(valid_df)
     file_basename = traversable_object.name
     return df_temp_data, logger_id, serial_numb, file_basename
 
@@ -32,12 +41,31 @@ def get_average_temp(df):
     return df["celsius"].mean()
 
 
+# def parse_(df):
+#     df = df.copy()
+#     df.rename(
+#         columns={
+#             "Time": "date_time",
+#             "Celsius(°C)": "celsius",
+#             "High Alarm": "high_alarm",
+#             "Low Alarm": "low_alarm",
+#             "Serial Number": "serial_number",
+#         },
+#         inplace=True,
+#     )
+#     logger_id = df.columns.values[0]
+#     serial_numb = df["serial_number"][0]
+#     df = df.rename(columns={logger_id: "row_numb"})
+#     df.drop(columns=["serial_number"], inplace=True)
+#     return df, logger_id, serial_numb
+
+
 def parse_(df):
     df = df.copy()
     df.rename(
         columns={
             "Time": "date_time",
-            "Celsius(°C)": "celsius",
+            "Celsius": "celsius",
             "High Alarm": "high_alarm",
             "Low Alarm": "low_alarm",
             "Serial Number": "serial_number",
@@ -53,11 +81,39 @@ def parse_(df):
 
 def get_user_confirmation(file_basename, logger_id):
     user_input = input(
-        f"It looks like your temperature trace '{file_basename}' for logger {logger_id} may have come from either cold storage or fridge.Please confirm here (FG/CS):")
+        f"It looks like your temperature trace '{file_basename}' for logger {logger_id} may have come from either cold storage or fridge.Please confirm here (FG/CS):"
+    )
     return user_input
 
 
-def validate(file):
+# def validate(file):
+#     try:
+#         df = pd.read_csv(file, encoding="latin-1")
+#         if df.empty:
+#             logger.warning(f"Empty dataframe when trying to load {file}")
+#             raise ValueError(f"Empty dataframe when trying to load {file}")
+
+#         required_columns = ["Time", "Celsius"]
+#         missing_columns = missing_column_check(df.columns, required_columns)
+#         if missing_columns:
+#             logger.warning(f"Some columns are missing: {(', ').join(missing_columns)}")
+#             raise KeyError(f"Some columns are missing: {(', ').join(missing_columns)}")
+
+#         selected_cols = select_time_celsius_cols(df.columns)
+#         for column in selected_cols:
+#             if df[column].isna().any():
+#                 logger.warning(f"Some values are missing in '{column}' column")
+#                 raise ValueError(f"Some values are missing in '{column}' column")
+#         file.seek(0)
+#         return file
+#     except (ValueError, KeyError) as e:
+#         raise e from None  # re-raising independently so that either error is not caught by 'except Exception as e'
+#     except Exception as e:
+#         logger.error(f"Unexpected error ({e}) occured when trying to load '{file}'")
+#         raise e from None
+
+
+def validate_and_convert(file):
     try:
         df = pd.read_csv(file, encoding="latin-1")
         if df.empty:
@@ -70,12 +126,16 @@ def validate(file):
             logger.warning(f"Some columns are missing: {(', ').join(missing_columns)}")
             raise KeyError(f"Some columns are missing: {(', ').join(missing_columns)}")
 
+        df.columns = df.columns.map(read_convert_headers)
+
         for column in required_columns:
             if df[column].isna().any():
                 logger.warning(f"Some values are missing in '{column}' column")
                 raise ValueError(f"Some values are missing in '{column}' column")
-        file.seek(0)
-        return file
+
+        df = convert_dtypes(df)
+
+        return df
     except (ValueError, KeyError) as e:
         raise e from None  # re-raising independently so that either error is not caught by 'except Exception as e'
     except Exception as e:
@@ -173,7 +233,7 @@ def get_files(package, folder):
 
 
 def missing_column_check(columns, required_cols):
-    """Check whether required columns ('time', 'celsius') are present among the given column names 
+    """Check whether required columns ('time', 'celsius') are present among the given column names
     while avoiding direct comparison of strings to each other due to mangled encoding around the degree symbol.
     """
     missing_cols = []
@@ -181,13 +241,72 @@ def missing_column_check(columns, required_cols):
         required_cols_lower = [req_col.lower() for req_col in required_cols]
         columns_lower = [col.lower() for col in columns]
     except AttributeError:
-        logger.warning('Failed to convert column names to lower-case')
-        raise AttributeError('Failed to convert column names to lower-case')
+        logger.warning("Failed to convert column names to lower-case")
+        raise AttributeError("Failed to convert column names to lower-case")
     except Exception:
-        logger.warning('Unknown error when trying to convert column names to lower-case')
-        raise AttributeError('Unknown error when trying to convert column names to lower-case')
+        logger.warning(
+            "Unknown error when trying to convert column names to lower-case"
+        )
+        raise AttributeError(
+            "Unknown error when trying to convert column names to lower-case"
+        )
     for req in required_cols_lower:
-        if req not in "".join(columns_lower): #create mega-string of all column names to quickly check if required column is present
+        if req not in "".join(
+            columns_lower
+        ):  # create mega-string of all column names to quickly check if required column is present
             missing_cols.append(req.capitalize())
     return missing_cols
 
+
+# def select_time_celsius_cols(columns):
+#     try:
+#         time_cols = [col for col in columns if "time" in col.lower()]
+#         celsius_cols = [col for col in columns if "celsius" in col.lower()]
+#     except AttributeError:
+#         logger.warning('Failed to convert column names to lower-case')
+#         raise AttributeError('Failed to convert column names to lower-case')
+#     except Exception:
+#         logger.warning('Unknown error while trying to select time and celsius columns')
+#         raise AttributeError('Unknown error while trying to select time and celsius columns')
+#     selected_cols = time_cols + celsius_cols
+#     return selected_cols
+
+
+def read_convert_headers(header):
+    expected_headers = ["Time", "Celsius", "High Alarm", "Low Alarm", "Serial Number"]
+    for hd in expected_headers:
+        try:
+            if hd.lower() in header.lower():
+                return hd
+        except AttributeError:
+            logger.warning(f"Failed to convert header '{header}' to an expected header")
+            raise AttributeError(
+                f"Failed to convert header '{header}' to an expected header"
+            )
+        except Exception as e:
+            logger.warning(
+                f"Unexpected error ({e}) occured when trying to convert header '{header}'"
+            )
+            raise Exception(
+                f"Unexpected error ({e}) occured when trying to convert header '{header}'"
+            )
+
+
+def convert_dtypes(df):
+    expected = {
+        "Serial Number": str,
+        "Celsius": float,
+        "High Alarm": float,
+        "Low Alarm": float,
+        "Time": pd.to_datetime,
+    }
+    for col, conversion_type in expected.items():
+        try:
+            if conversion_type is pd.to_datetime:
+                df[col] = conversion_type(df[col])
+            else:
+                df[col] = df[col].astype(conversion_type)
+        except (ValueError, TypeError) as e:
+            logger.warning(f"Failed to convert column '{col}' using {conversion_type}")
+            raise e(f"Failed to convert column '{col}' using {conversion_type}")
+    return df
