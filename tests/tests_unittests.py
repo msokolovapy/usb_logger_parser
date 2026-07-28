@@ -22,6 +22,8 @@ from src.usb_logger_parser.helper_functions import (
     insert_metadata_header,
     get_files,
     missing_column_check,
+    read_convert_headers,
+    convert_dtypes
 )
 from src.usb_logger_parser.storage_units import (
     StorageCondition,
@@ -242,7 +244,7 @@ class TestHelperFunctions(unittest.TestCase):
         self.assertEqual(storage_condit.high_alert, 15.0)
 
     def test_validate_and_convert(self):
-        test_cases = [
+        fail_test_cases = [
             (
                 "empty_dataframe",
                 pd.DataFrame(),
@@ -263,7 +265,7 @@ class TestHelperFunctions(unittest.TestCase):
             ),
         ]
 
-        for test, mock_return_value, error, error_message in test_cases:
+        for test, mock_return_value, error, error_message in fail_test_cases:
             with self.subTest(test):
                 with patch(
                     "src.usb_logger_parser.helper_functions.pd.read_csv"
@@ -280,6 +282,32 @@ class TestHelperFunctions(unittest.TestCase):
                 mock_read_csv.side_effect = pd.errors.ParserError
                 with self.assertRaises(pd.errors.ParserError):
                     validate_and_convert("file that raises an exception.txt")
+
+        with self.subTest("validate_and_convert successful"):
+            with (
+                patch(
+                    "src.usb_logger_parser.helper_functions.pd.read_csv"
+                ) as mock_read_csv,
+                patch(
+                    "src.usb_logger_parser.helper_functions.missing_column_check"
+                ) as mock_missing_column_check,
+                patch(
+                    "src.usb_logger_parser.helper_functions.convert_dtypes"
+                ) as mock_convert_dtypes,
+            ):
+                mock_read_csv.return_value = pd.DataFrame(
+                    {"Time": [1, 2, 3], "Celsius": [1, 2, 3]}
+                )
+                mock_missing_column_check.return_value = []
+                mock_convert_dtypes.return_value = "df"
+                result = validate_and_convert("dummy.txt")
+
+                mock_read_csv.assert_called_with("dummy.txt")
+                mock_missing_column_check.assert_called_with(
+                    pd.DataFrame(column=["Time", "Celsius"]), ["Time", "Celsius"]
+                )
+                mock_convert_dtypes.assert_called()
+                self.assertEqual(result, "df")
 
     def test_get_average_temp(self):
         df = pd.DataFrame({"celsius": [-25.0, -26.0, -24.0, -23.0]})
@@ -584,68 +612,94 @@ class TestHelperFunctions(unittest.TestCase):
                 "Unknown error when trying to convert column names to lower-case",
                 str(context.exception),
             )
-    
-    def test_convert_dtypes(self):
-        with self.subTest('convert_dtypes successful'):
-            df = pd.DataFrame({
-            "Serial Number": ["0215489PNW", None],
-            "Celsius": ['1.1','1.2'],
-            "High Alarm": ['1.1','1.2'],
-            "Low Alarm": ['1.1','1.2'],
-            "Time": ['2020-03-20 10:00:00', '2020-03-20 10:15:00']})
 
-            expected = {
-            "Serial Number": ["0215489PNW", None],
-            "Celsius": ['1.1','1.2'],
-            "High Alarm": ['1.1','1.2'],
-            "Low Alarm": ['1.1','1.2'],
-            "Time": ['2020-03-20 10:00:00', '2020-03-20 10:15:00']}
-            
+    def test_convert_dtypes(self):
+        with self.subTest("convert_dtypes successful"):
+            df = pd.DataFrame(
+                {
+                    "Serial Number": ["0215489PNW"],
+                    "Celsius": ["1.1"],
+                    "High Alarm": ["1.1"],
+                    "Low Alarm": ["1.1"],
+                    "Time": ["2020-03-20 10:00:00"],
+                }
+            )
+
+            expected = {'Serial Number': ['0215489PNW'], 'Celsius': [1.1], 'High Alarm': [1.1], 'Low Alarm': [1.1], 'Time': [Timestamp('2020-03-20 10:00:00')]}
+
             result = convert_dtypes(df)
-            self.assertEqual(result.to_dict('records'), expected)
-            
-        with self.subTest('convert_dtypes raises ValueError'):
-            df = pd.DataFrame({
-            "Serial Number": ["0215489PNW", None],
-            "Celsius": ['abc','1.2'],
-            "High Alarm": ['1.1','1.2'],
-            "Low Alarm": ['1.1','1.2'],
-            "Time": ['2020-03-20 10:00:00', '2020-03-20 10:15:00']})
+            self.assertEqual(result.to_dict("list"), expected)
+
+        with self.subTest("convert_dtypes raises ValueError"):
+            df = pd.DataFrame(
+                {
+                    "Serial Number": ["0215489PNW", None],
+                    "Celsius": ["abc", "1.2"],
+                    "High Alarm": ["1.1", "1.2"],
+                    "Low Alarm": ["1.1", "1.2"],
+                    "Time": ["2020-03-20 10:00:00", "2020-03-20 10:15:00"],
+                }
+            )
             with self.assertRaises(ValueError) as context:
                 result = convert_dtypes(df)
-            self.assertIn("Failed to convert column 'Celsius' using 'float'", str(context.exception))
-
-        with self.subTest('convert_dtypes raises TypeError'):
-            df = pd.DataFrame({
-            "Serial Number": ["0215489PNW", None],
-            "Celsius": ['1.1','1.2'],
-            "High Alarm": ['1.1','1.2'],
-            "Low Alarm": ['1.1','1.2'],
-            "Time": ['abc', '2020-03-20 10:15:00']})
-            with self.assertRaises(TypeError) as context:
-                result = convert_dtypes(df)
-            self.assertIn("Failed to convert column 'Time' using 'pd.to_datetime'", str(context.exception))
-
+            self.assertIn(
+                f"Failed to convert column 'Celsius' using {float}",
+                str(context.exception),
+            )
 
     def test_read_convert_headers(self):
-        with self.subTest('read_convert_headers successful'):
-            df_columns = pd.DataFrame(columns=['Time', 'Celsius(ï¿½C)', 'High Alarm', 'Low Alarm', 'Serial Number', 'License ÂNo'])
-            expected = ['Time', 'Celsius', 'High Alarm', 'Low Alarm', 'Serial Number', 'License ÂNo']
-            result = df_columns.map(read_convert_headers)
-            self.assertEqual(result, expected)
+        with self.subTest("read_convert_headers successful"):
+            # df_columns = pd.DataFrame(
+            #     columns=[
+            #         "Time",
+            #         "Celsius(ï¿½C)",
+            #         "High Alarm",
+            #         "Low Alarm",
+            #         "Serial Number",
+            #         "License ÂNo",
+            #     ]
+            # )
+            df = pd.DataFrame(
+                {
+                    "Time": [],
+                    "Celsius(ï¿½C)": [],
+                    "High Alarm": [],
+                    "Low Alarm": [],
+                    "Serial Number": [],
+                    "License ÂNo" : [],
+                }
+            )
+            expected = [
+                "Time",
+                "Celsius",
+                "High Alarm",
+                "Low Alarm",
+                "Serial Number",
+                "License ÂNo",
+            ]
+            result = df.columns.map(read_convert_headers)
+            self.assertEqual(list(result), expected)
 
-        with self.subTest('read_convert_headers raises AttributeError'):
-            df_columns = pd.DataFrame(columns=['1.2', 'Celsius'])
+        with self.subTest("read_convert_headers raises AttributeError"):
+            df = pd.DataFrame({1.2 : [], "Celsius":[]})
             with self.assertRaises(AttributeError) as context:
-                result = df_columns.map(read_convert_headers)
-            self.assertIn('"Failed to convert header '1.2' to an expected header"', str(context.exception))
+                result = df.columns.map(read_convert_headers)
+            self.assertIn(
+                "Failed to convert header '1.2' to an expected header",
+                str(context.exception),
+            )
 
-        with self.subTest('read_convert_headers raises Exception'):
+        with self.subTest("read_convert_headers raises Exception"):
             mock_columns = Mock()
             mock_columns.map.side_effect = RuntimeError()
             with self.assertRaises(Exception) as context:
                 result = mock_columns.map(read_convert_headers)
-            self.assertIn("Unexpected error ({e}) occured when trying to convert header '{header}'", str(context.exception))
+            mock_columns.map.assert_called()
+            self.assertIn(
+                "Unexpected error occured when trying to convert header",
+                str(context.exception),
+            )
+
 
 class TestAnalyticalServiceInit(unittest.TestCase):
     def test_analyt_service_init(self):

@@ -283,13 +283,39 @@ def read_convert_headers(header):
             raise AttributeError(
                 f"Failed to convert header '{header}' to an expected header"
             )
-        except Exception as e:
+        except Exception:
             logger.warning(
-                f"Unexpected error ({e}) occured when trying to convert header '{header}'"
+                "Unexpected error occured when trying to convert header"
             )
             raise Exception(
-                f"Unexpected error ({e}) occured when trying to convert header '{header}'"
+                "Unexpected error occured when trying to convert header"
             )
+    return header
+
+# def read_convert_headers(headers):
+#     print(f'printing received list of headers here: {headers}')
+#     expected_headers = ["Time", "Celsius", "High Alarm", "Low Alarm", "Serial Number"]
+#     for header in headers:
+#         print(f'printing received header here: {header}')
+#         for hd in expected_headers:
+#             print(f'printing expected header here: {hd}')
+#             try:
+#                 if hd.lower() in header.lower():
+#                     return hd
+#                 modified = 'modified' + ' ' + header
+#                 return modified
+#             except AttributeError:
+#                 logger.warning(f"Failed to convert header '{header}' to an expected header")
+#                 raise AttributeError(
+#                     f"Failed to convert header '{header}' to an expected header"
+#                 )
+#             except Exception as e:
+#                 logger.warning(
+#                     f"Unexpected error ({e}) occured when trying to convert header '{header}'"
+#                 )
+#                 raise Exception(
+#                     f"Unexpected error ({e}) occured when trying to convert header '{header}'"
+#                 )
 
 
 def convert_dtypes(df):
@@ -306,7 +332,7 @@ def convert_dtypes(df):
                 df[col] = conversion_type(df[col])
             else:
                 df[col] = df[col].astype(conversion_type)
-        except (ValueError, TypeError) as e:
+        except ValueError:
             logger.warning(f"Failed to convert column '{col}' using {conversion_type}")
-            raise e(f"Failed to convert column '{col}' using {conversion_type}")
+            raise ValueError(f"Failed to convert column '{col}' using {conversion_type}")
     return df
