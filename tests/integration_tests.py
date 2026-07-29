@@ -65,7 +65,7 @@ class TestReportSpikes(unittest.TestCase):
         )
         file_list = get_files("src.usb_logger_parser", "resources")
         with patch("builtins.input") as mock_input:
-            mock_input.return_value = "fg" #bypassing mandatory user input for Fridge or ColdStorage object creation
+            mock_input.return_value = "fg"  # bypassing mandatory user input for Fridge or ColdStorage object creation
             storage_conditions = [
                 StorageCondition.create_from_(file) for file in file_list
             ]

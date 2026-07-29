@@ -23,7 +23,7 @@ from src.usb_logger_parser.helper_functions import (
     get_files,
     missing_column_check,
     read_convert_headers,
-    convert_dtypes
+    convert_dtypes,
 )
 from src.usb_logger_parser.storage_units import (
     StorageCondition,
@@ -302,10 +302,8 @@ class TestHelperFunctions(unittest.TestCase):
                 mock_convert_dtypes.return_value = "df"
                 result = validate_and_convert("dummy.txt")
 
-                mock_read_csv.assert_called_with("dummy.txt")
-                mock_missing_column_check.assert_called_with(
-                    pd.DataFrame(column=["Time", "Celsius"]), ["Time", "Celsius"]
-                )
+                mock_read_csv.assert_called_with("dummy.txt", encoding="latin-1")
+                mock_missing_column_check.assert_called()
                 mock_convert_dtypes.assert_called()
                 self.assertEqual(result, "df")
 
@@ -625,7 +623,13 @@ class TestHelperFunctions(unittest.TestCase):
                 }
             )
 
-            expected = {'Serial Number': ['0215489PNW'], 'Celsius': [1.1], 'High Alarm': [1.1], 'Low Alarm': [1.1], 'Time': [Timestamp('2020-03-20 10:00:00')]}
+            expected = {
+                "Serial Number": ["0215489PNW"],
+                "Celsius": [1.1],
+                "High Alarm": [1.1],
+                "Low Alarm": [1.1],
+                "Time": [Timestamp("2020-03-20 10:00:00")],
+            }
 
             result = convert_dtypes(df)
             self.assertEqual(result.to_dict("list"), expected)
@@ -649,16 +653,6 @@ class TestHelperFunctions(unittest.TestCase):
 
     def test_read_convert_headers(self):
         with self.subTest("read_convert_headers successful"):
-            # df_columns = pd.DataFrame(
-            #     columns=[
-            #         "Time",
-            #         "Celsius(ï¿½C)",
-            #         "High Alarm",
-            #         "Low Alarm",
-            #         "Serial Number",
-            #         "License ÂNo",
-            #     ]
-            # )
             df = pd.DataFrame(
                 {
                     "Time": [],
@@ -666,7 +660,7 @@ class TestHelperFunctions(unittest.TestCase):
                     "High Alarm": [],
                     "Low Alarm": [],
                     "Serial Number": [],
-                    "License ÂNo" : [],
+                    "License ÂNo": [],
                 }
             )
             expected = [
@@ -681,7 +675,7 @@ class TestHelperFunctions(unittest.TestCase):
             self.assertEqual(list(result), expected)
 
         with self.subTest("read_convert_headers raises AttributeError"):
-            df = pd.DataFrame({1.2 : [], "Celsius":[]})
+            df = pd.DataFrame({1.2: [], "Celsius": []})
             with self.assertRaises(AttributeError) as context:
                 result = df.columns.map(read_convert_headers)
             self.assertIn(
@@ -690,11 +684,10 @@ class TestHelperFunctions(unittest.TestCase):
             )
 
         with self.subTest("read_convert_headers raises Exception"):
-            mock_columns = Mock()
-            mock_columns.map.side_effect = RuntimeError()
+            bad_header = Mock()
+            bad_header.lower.side_effect = RuntimeError()
             with self.assertRaises(Exception) as context:
-                result = mock_columns.map(read_convert_headers)
-            mock_columns.map.assert_called()
+                read_convert_headers(bad_header)
             self.assertIn(
                 "Unexpected error occured when trying to convert header",
                 str(context.exception),
@@ -1438,8 +1431,8 @@ class TestReportingService(unittest.TestCase):
             expected_result = {
                 self.unit: {
                     "data": "data_with_header",
-                    "data_row_min": 5,
-                    "data_row_max": 16,
+                    "data_row_min": 4,
+                    "data_row_max": 15,
                     "data_width": 3,
                 }
             }

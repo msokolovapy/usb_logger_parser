@@ -14,13 +14,16 @@ class ReportingService:
 
     def prepare_data_for_reporting(self, unit):
         data = extract_to_list(unit.temp_data)
+        print(f'length of data for {unit.logger.id} without header is {len(data)}')
         data_width = unit.temp_data.shape[1]
 
         data_with_header = insert_metadata_header(data, unit.metadata)
         data_row_min = (
-            len(unit.metadata) + 2
-        )  # to account for column fields already present in data
-        data_row_max = len(data_with_header)
+            len(unit.metadata) + 1
+        )  # +1 accounts for column headers already present in data
+        print(f'row min value for {unit.logger.id} is {data_row_min}')
+        data_row_max = len(data_with_header) - 1 # -1 accounts for zero-index based xlsxwriter 'write' method 
+        print(f'row max value for {unit.logger.id} is {data_row_max}')
         return {
             unit: {
                 "data": data_with_header,
