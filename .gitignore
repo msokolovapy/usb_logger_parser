@@ -1,0 +1,8 @@
+usb_logger_parser_venv/
+__pycache__/
+*.pyc
+dist/
+*.egg-info/
+.secrets
+*.log
+src/usb_logger_parser/*.xlsx
