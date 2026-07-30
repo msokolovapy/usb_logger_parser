@@ -7,7 +7,7 @@ from helper_functions import get_files
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(module)s.%(funcName)s - %(levelname)s - %(message)s",
-    handlers=[logging.FileHandler("app.log"), logging.StreamHandler()],
+    handlers=[logging.FileHandler("app.log")],
 )
 
 
