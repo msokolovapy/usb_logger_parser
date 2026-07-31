@@ -6,7 +6,8 @@ import pandas as pd
 from pandas import Timestamp
 from xlsxwriter import Workbook
 import logging
-from src.usb_logger_parser.helper_functions import (
+
+from usb_logger_parser.helper_functions import (
     read,
     parse_,
     get_user_confirmation,
@@ -25,19 +26,19 @@ from src.usb_logger_parser.helper_functions import (
     read_convert_headers,
     convert_dtypes,
 )
-from src.usb_logger_parser.storage_units import (
+from usb_logger_parser.storage_units import (
     StorageCondition,
     Fridge,
     create_storage_condition_manually,
 )
-
-from src.usb_logger_parser.analytical_service import AnalyticalService
-
-from src.usb_logger_parser.reporting_service import (
+from usb_logger_parser.analytical_service import AnalyticalService
+from usb_logger_parser.reporting_service import (
     ReportingService,
     XLSXGraph,
     XLSXSummary,
 )
+
+
 
 logger = logging.getLogger(__name__)
 
@@ -130,18 +131,18 @@ class TestColdChainUnit(unittest.TestCase):
     def test_cc_unit_init(self):
         file = "dummy.txt"
         with (
-            patch("src.usb_logger_parser.storage_units.read") as mock_read,
+            patch("usb_logger_parser.storage_units.read") as mock_read,
             patch(
-                "src.usb_logger_parser.storage_units.get_ave_data_coll_freq"
+                "usb_logger_parser.storage_units.get_ave_data_coll_freq"
             ) as mock_ave_data_coll_freq,
             patch(
-                "src.usb_logger_parser.storage_units.get_average_temp"
+                "usb_logger_parser.storage_units.get_average_temp"
             ) as mock_get_ave_temp,
             patch(
-                "src.usb_logger_parser.storage_units.get_user_confirmation"
+                "usb_logger_parser.storage_units.get_user_confirmation"
             ) as mock_user_confirmation,
             patch(
-                "src.usb_logger_parser.storage_units.create_storage_condition_manually"
+                "usb_logger_parser.storage_units.create_storage_condition_manually"
             ) as mock_manual_create,
         ):
             mock_read.return_value = (
@@ -173,15 +174,15 @@ class TestColdChainUnit(unittest.TestCase):
 
     def test_create_cc_unit(self):
         with (
-            patch("src.usb_logger_parser.storage_units.read") as mock_read,
+            patch("usb_logger_parser.storage_units.read") as mock_read,
             patch(
-                "src.usb_logger_parser.storage_units.get_ave_data_coll_freq"
+                "usb_logger_parser.storage_units.get_ave_data_coll_freq"
             ) as mock_ave_data_coll_freq,
             patch(
-                "src.usb_logger_parser.storage_units.get_average_temp"
+                "usb_logger_parser.storage_units.get_average_temp"
             ) as mock_get_ave_temp,
             patch(
-                "src.usb_logger_parser.storage_units.get_user_confirmation"
+                "usb_logger_parser.storage_units.get_user_confirmation"
             ) as mock_user_confirmation,
         ):
 
@@ -268,7 +269,7 @@ class TestHelperFunctions(unittest.TestCase):
         for test, mock_return_value, error, error_message in fail_test_cases:
             with self.subTest(test):
                 with patch(
-                    "src.usb_logger_parser.helper_functions.pd.read_csv"
+                    "usb_logger_parser.helper_functions.pd.read_csv"
                 ) as mock_read_csv:
                     mock_read_csv.return_value = mock_return_value
                     with self.assertRaises(error) as context:
@@ -277,7 +278,7 @@ class TestHelperFunctions(unittest.TestCase):
 
         with self.subTest("any other random exception"):
             with patch(
-                "src.usb_logger_parser.helper_functions.pd.read_csv"
+                "usb_logger_parser.helper_functions.pd.read_csv"
             ) as mock_read_csv:
                 mock_read_csv.side_effect = pd.errors.ParserError
                 with self.assertRaises(pd.errors.ParserError):
@@ -286,13 +287,13 @@ class TestHelperFunctions(unittest.TestCase):
         with self.subTest("validate_and_convert successful"):
             with (
                 patch(
-                    "src.usb_logger_parser.helper_functions.pd.read_csv"
+                    "usb_logger_parser.helper_functions.pd.read_csv"
                 ) as mock_read_csv,
                 patch(
-                    "src.usb_logger_parser.helper_functions.missing_column_check"
+                    "usb_logger_parser.helper_functions.missing_column_check"
                 ) as mock_missing_column_check,
                 patch(
-                    "src.usb_logger_parser.helper_functions.convert_dtypes"
+                    "usb_logger_parser.helper_functions.convert_dtypes"
                 ) as mock_convert_dtypes,
             ):
                 mock_read_csv.return_value = pd.DataFrame(
@@ -351,9 +352,9 @@ class TestHelperFunctions(unittest.TestCase):
     def test_read(self):
         with (
             patch(
-                "src.usb_logger_parser.helper_functions.validate_and_convert"
+                "usb_logger_parser.helper_functions.validate_and_convert"
             ) as mock_valid_df,
-            patch("src.usb_logger_parser.helper_functions.parse_") as mock_parse,
+            patch("usb_logger_parser.helper_functions.parse_") as mock_parse,
         ):
             mock_traversable_obj = MagicMock()
             mock_traversable_obj.name = self.file_basename
@@ -541,7 +542,7 @@ class TestHelperFunctions(unittest.TestCase):
 
     def test_get_files(self):
         with patch(
-            "src.usb_logger_parser.helper_functions.files"
+            "usb_logger_parser.helper_functions.files"
         ) as mock_importlib_files:
             with self.subTest("importlib unexpected error"):
                 mock_importlib_files.return_value = None
@@ -1336,10 +1337,10 @@ class TestAnalyticalService(unittest.TestCase):
     def test_prepare_spike_summary_for_reporting(self):
         with (
             patch(
-                "src.usb_logger_parser.analytical_service.extract_to_list"
+                "usb_logger_parser.analytical_service.extract_to_list"
             ) as mock_extract_to_list,
             patch(
-                "src.usb_logger_parser.analytical_service.insert_metadata_header"
+                "usb_logger_parser.analytical_service.insert_metadata_header"
             ) as mock_insert_metadata_header,
         ):
             df_excursions = MagicMock()
@@ -1419,10 +1420,10 @@ class TestReportingService(unittest.TestCase):
     def test_prepare_data_for_reporting_(self):
         with (
             patch(
-                "src.usb_logger_parser.reporting_service.extract_to_list"
+                "usb_logger_parser.reporting_service.extract_to_list"
             ) as mock_extract_to_list,
             patch(
-                "src.usb_logger_parser.reporting_service.insert_metadata_header"
+                "usb_logger_parser.reporting_service.insert_metadata_header"
             ) as mock_insert_metadata_header,
         ):
             mock_extract_to_list.return_value = "data_extracted"
@@ -1449,7 +1450,7 @@ class TestReportingService(unittest.TestCase):
 
     def test_report_spikes(self):
         with patch(
-            "src.usb_logger_parser.reporting_service.XLSXSummary"
+            "usb_logger_parser.reporting_service.XLSXSummary"
         ) as mock_xlsx_summary:
 
             self.reporting_service.report_spikes("spike_info_list")

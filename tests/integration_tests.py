@@ -2,19 +2,19 @@ import unittest
 from datetime import datetime
 from unittest.mock import patch
 
-from src.usb_logger_parser.storage_units import StorageCondition, Freezer, Fridge
-from src.usb_logger_parser.analytical_service import AnalyticalService
-from src.usb_logger_parser.reporting_service import (
+from usb_logger_parser.storage_units import StorageCondition, Freezer, Fridge
+from usb_logger_parser.analytical_service import AnalyticalService
+from usb_logger_parser.reporting_service import (
     ReportingService,
 )
-from src.usb_logger_parser.helper_functions import get_files
+from usb_logger_parser.helper_functions import get_files
 
 
 class TestColdStorageUnit(unittest.TestCase):
     def test_cold_storage_unit_type(self):
         with patch("builtins.input") as mock_input:
             mock_input.return_value = "fg"
-            file_list = get_files("src.usb_logger_parser", "resources")
+            file_list = get_files("usb_logger_parser", "resources")
             storage_units = [StorageCondition.create_from_(file) for file in file_list]
         expected_values = [
             {
@@ -39,11 +39,11 @@ class TestColdStorageUnit(unittest.TestCase):
 class TestReportRawData(unittest.TestCase):
     def test_report_raw_data(self):
         today = datetime.now().strftime("%Y-%m-%d")
-        file_list = get_files("src.usb_logger_parser", "resources")
+        file_list = get_files("usb_logger_parser", "resources")
         reporting_service = ReportingService(f"{today}_integration_tests_graph")
         with (
             patch(
-                "src.usb_logger_parser.reporting_service.data_collection_frequency_check"
+                "usb_logger_parser.reporting_service.data_collection_frequency_check"
             ) as mock_freq_check,
             patch("builtins.input") as mock_user_input,
         ):
@@ -63,7 +63,7 @@ class TestReportSpikes(unittest.TestCase):
         reporting_service = ReportingService(
             f"{today}_integration_tests_spikes_summary"
         )
-        file_list = get_files("src.usb_logger_parser", "resources")
+        file_list = get_files("usb_logger_parser", "resources")
         with patch("builtins.input") as mock_input:
             mock_input.return_value = "fg"  # bypassing mandatory user input for Fridge or ColdStorage object creation
             storage_conditions = [

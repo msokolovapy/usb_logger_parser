@@ -2,7 +2,7 @@ from xlsxwriter import Workbook
 import logging
 import pandas as pd
 from datetime import datetime, date
-from src.usb_logger_parser.helper_functions import data_collection_frequency_check, extract_to_list, insert_metadata_header
+from usb_logger_parser.helper_functions import data_collection_frequency_check, extract_to_list, insert_metadata_header
 
 logger = logging.getLogger(__name__)
 

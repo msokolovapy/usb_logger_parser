@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from src.usb_logger_parser.helper_functions import (
+from usb_logger_parser.helper_functions import (
     read,
     get_average_temp,
     get_user_confirmation,
