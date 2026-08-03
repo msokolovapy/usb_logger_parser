@@ -64,7 +64,7 @@ src/
     ├── storage_units.py
     ├── analytical_service.py
     └── reporting_service.py
-
+output/
 tests/
 ├── unittests.py
 └── integration_tests.py
