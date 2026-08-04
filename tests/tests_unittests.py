@@ -39,8 +39,6 @@ from usb_logger_parser.reporting_service import (
     XLSXSummary,
 )
 
-
-
 logger = logging.getLogger(__name__)
 
 SAMPLE_DF = pd.DataFrame(
@@ -542,9 +540,7 @@ class TestHelperFunctions(unittest.TestCase):
         self.assertEqual(expected, result.to_dict("list"))
 
     def test_get_files(self):
-        with patch(
-            "usb_logger_parser.helper_functions.files"
-        ) as mock_importlib_files:
+        with patch("usb_logger_parser.helper_functions.files") as mock_importlib_files:
             with self.subTest("importlib unexpected error"):
                 mock_importlib_files.return_value = None
                 with self.assertRaises(Exception) as ctx:
@@ -1450,8 +1446,10 @@ class TestReportingService(unittest.TestCase):
             self.assertEqual(result, expected_result)
 
     def test_report_spikes(self):
-        output_dir = Path('output')
-        with patch("usb_logger_parser.reporting_service.XLSXSummary") as mock_xlsx_summary:
+        output_dir = Path("output")
+        with patch(
+            "usb_logger_parser.reporting_service.XLSXSummary"
+        ) as mock_xlsx_summary:
             self.reporting_service.report_spikes("spike_info_list")
 
             mock_xlsx_summary.assert_called_with("spike_info_list", output_dir, None)
@@ -1463,7 +1461,7 @@ class TestXLSXSummary(unittest.TestCase):
         spikes_list = []
         today = datetime.datetime.now().strftime("%Y-%m-%d")
         output_path = None
-        output_dir = Path('output')
+        output_dir = Path("output")
 
         result = XLSXSummary(spikes_list, output_dir, output_path)
 
@@ -1471,7 +1469,9 @@ class TestXLSXSummary(unittest.TestCase):
         self.assertIsNotNone(result.spikes_list)
         self.assertIsNotNone(result.wb)
         self.assertIsNotNone(result.ws)
-        self.assertEqual(f'{result.file_path}.xlsx', f"{output_dir}/{today}_spikes_summary.xlsx")
+        self.assertEqual(
+            f"{result.file_path}.xlsx", f"{output_dir}/{today}_spikes_summary.xlsx"
+        )
 
     def test_insert_data(self):
         sample_spikes_list = [
@@ -1520,7 +1520,7 @@ class TestXLSXSummary(unittest.TestCase):
         ]
         today = datetime.datetime.now().strftime("%Y-%m-%d")
         output_path = f"{today}_unittests_spikes_summary"
-        output_dir = Path('output')
+        output_dir = Path("output")
         xlsx_summary = XLSXSummary(sample_spikes_list, output_dir, output_path)
         xlsx_summary.insert_data()
 
@@ -1550,11 +1550,13 @@ class TestXLSXGraph(unittest.TestCase):
         }
         today = datetime.datetime.now().strftime("%Y-%m-%d")
         output_path = None
-        output_dir = Path('output')
+        output_dir = Path("output")
         result = XLSXGraph(data, output_dir, output_path)
         self.assertIsNotNone(result)
         self.assertEqual(result.start_col, 10)
-        self.assertEqual(f'{result.file_path}.xlsx', f'{output_dir}/{today}_usb_loggers_graph.xlsx')
+        self.assertEqual(
+            f"{result.file_path}.xlsx", f"{output_dir}/{today}_usb_loggers_graph.xlsx"
+        )
         self.assertEqual(
             result.x_axis_bounds,
             {"col_min": 0, "col_max": 0, "row_min": 0, "row_max": 0},
@@ -1583,8 +1585,8 @@ class TestXLSXGraph(unittest.TestCase):
             }
         ]
         today = datetime.datetime.now().strftime("%Y-%m-%d")
-        output_path = 'unused_path'
-        output_dir = Path('output')
+        output_path = "unused_path"
+        output_dir = Path("output")
         xlsxgraph = XLSXGraph(data, output_dir, output_path)
         xlsxgraph.insert_data()
         self.assertEqual(
@@ -1620,7 +1622,7 @@ class TestXLSXGraph(unittest.TestCase):
         ]
         today = datetime.datetime.now().strftime("%Y-%m-%d")
         output_path = f"{today}_unittests_graph"
-        output_dir = Path('output')
+        output_dir = Path("output")
         xlsxgraph = XLSXGraph(data, output_dir, output_path)
         xlsxgraph.insert_data()
         xlsxgraph.insert_chart()
