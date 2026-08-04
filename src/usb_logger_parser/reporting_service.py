@@ -3,16 +3,20 @@ from pathlib import Path
 import logging
 import pandas as pd
 from datetime import datetime, date
-from usb_logger_parser.helper_functions import data_collection_frequency_check, extract_to_list, insert_metadata_header
+from usb_logger_parser.helper_functions import (
+    data_collection_frequency_check,
+    extract_to_list,
+    insert_metadata_header,
+)
 
 logger = logging.getLogger(__name__)
 
 
 class ReportingService:
-    def __init__(self, output_path = None):
+    def __init__(self, output_path=None):
         self.data_to_graph = []
         self.output_path = output_path
-        self.output_dir = Path('output')
+        self.output_dir = Path("output")
         self.output_dir.mkdir(exist_ok=True)
 
     def prepare_data_for_reporting(self, unit):
@@ -23,7 +27,9 @@ class ReportingService:
         data_row_min = (
             len(unit.metadata) + 1
         )  # +1 accounts for column headers already present in data
-        data_row_max = len(data_with_header) - 1 # -1 accounts for zero-index based xlsxwriter 'write' method 
+        data_row_max = (
+            len(data_with_header) - 1
+        )  # -1 accounts for zero-index based xlsxwriter 'write' method
         return {
             unit: {
                 "data": data_with_header,
@@ -54,12 +60,12 @@ class ReportingService:
 
 
 class XLSXSummary:
-    def __init__(self, spikes_list, output_dir, output_path = None):
+    def __init__(self, spikes_list, output_dir, output_path=None):
         self.spikes_list = spikes_list
         self.file_path = output_dir / (output_path or self.get_file_name())
         self.wb = Workbook(f"{self.file_path}.xlsx")
         self.ws = self.wb.add_worksheet(
-            'spikes_summary'
+            "spikes_summary"
         )  # keeping worksheet as attribute as xlsxwriter cannot re-open worksheets
         self.datetime_format = self.wb.add_format(
             {"num_format": "dd/mm/yyyy hh:mm:ss"}
@@ -92,7 +98,7 @@ class XLSXSummary:
 
 
 class XLSXGraph:
-    def __init__(self, data_to_graph, output_dir, output_path = None):
+    def __init__(self, data_to_graph, output_dir, output_path=None):
         self.data_to_graph = data_to_graph
         self.start_col = 10
         self.x_axis_bounds = {
@@ -151,7 +157,9 @@ class XLSXGraph:
                                 self.datetime_format,
                             )
                         else:
-                            self.ws.write(row_idx, self.start_col + column_idx, data_column)
+                            self.ws.write(
+                                row_idx, self.start_col + column_idx, data_column
+                            )
 
                 self.start_col = self.start_col + data_width + 1
                 data[unit]["y_axis_bounds"] = y_axis_bounds
@@ -170,14 +178,14 @@ class XLSXGraph:
                     {
                         "name": unit.logger.id,
                         "categories": [
-                            'graph',
+                            "graph",
                             self.x_axis_bounds["row_min"],
                             self.x_axis_bounds["col_min"],
                             self.x_axis_bounds["row_max"],
                             self.x_axis_bounds["col_max"],
                         ],
                         "values": [
-                            'graph',
+                            "graph",
                             y_axis_bounds["row_min"],
                             y_axis_bounds["col_min"],
                             y_axis_bounds["row_max"],

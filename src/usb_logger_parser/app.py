@@ -12,7 +12,7 @@ logging.basicConfig(
 
 
 def main():
-    file_list = get_files('usb_logger_parser', 'resources')
+    file_list = get_files("usb_logger_parser", "resources")
     reporting_service = ReportingService()
     analytical_service = AnalyticalService()
     storage_units = [StorageCondition.create_from_(file) for file in file_list]

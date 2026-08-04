@@ -39,11 +39,7 @@ class StorageCondition:
                 else:
                     print("Please either enter FG or CS")
                     continue
-        elif (
-            Limits.freezer.low_alarm
-            <= average_temp
-            <= Limits.freezer.high_alarm
-        ):
+        elif Limits.freezer.low_alarm <= average_temp <= Limits.freezer.high_alarm:
             return Freezer(
                 df_temp_data, logger_id, serial_numb, ave_data_coll_freq, file_basename
             )

@@ -9,7 +9,7 @@ from usb_logger_parser.helper_functions import (
     get_spike_duration,
     convert_timestamps,
     extract_to_list,
-    insert_metadata_header
+    insert_metadata_header,
 )
 
 
@@ -185,10 +185,11 @@ class AnalyticalService:
         mkt = round(mkt, 1)
         return mkt
 
-
     def prepare_spike_summary_for_reporting(self, df_excursions, metadata):
         df_excursions["mkt"] = df_excursions["mkt"].fillna("Not applicable")
-        df_excursions['spike_duration_24hr_mins'] = df_excursions['spike_duration_24hr_mins'].fillna("Not applicable")
+        df_excursions["spike_duration_24hr_mins"] = df_excursions[
+            "spike_duration_24hr_mins"
+        ].fillna("Not applicable")
         data = extract_to_list(df_excursions)
         data_with_header = insert_metadata_header(data, metadata)
         return data_with_header

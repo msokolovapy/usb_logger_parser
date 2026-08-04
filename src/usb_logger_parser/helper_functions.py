@@ -225,7 +225,9 @@ def convert_dtypes(df):
                 else:
                     df[col] = df[col].astype(conversion_type)
             except ValueError:
-                logger.warning(f"Failed to convert column '{col}' using {conversion_type}")
+                logger.warning(
+                    f"Failed to convert column '{col}' using {conversion_type}"
+                )
                 raise ValueError(
                     f"Failed to convert column '{col}' using {conversion_type}"
                 )
