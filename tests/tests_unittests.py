@@ -1,42 +1,41 @@
 import datetime
+import logging
 import unittest
-from unittest.mock import Mock, MagicMock
-from unittest.mock import patch
+from pathlib import Path
+from unittest.mock import MagicMock, Mock, patch
+
 import pandas as pd
 from pandas import Timestamp
 from xlsxwriter import Workbook
-import logging
-from pathlib import Path
 
+from usb_logger_parser.analytical_service import AnalyticalService
 from usb_logger_parser.helper_functions import (
-    read,
-    parse_,
-    get_user_confirmation,
-    validate_and_convert,
+    convert_dtypes,
+    convert_timestamps,
+    data_collection_frequency_check,
+    extract_to_list,
+    get_ave_data_coll_freq,
     get_average_temp,
     get_extreme_date_time,
     get_extreme_temp,
-    get_spike_duration,
-    convert_timestamps,
-    data_collection_frequency_check,
-    get_ave_data_coll_freq,
-    extract_to_list,
-    insert_metadata_header,
     get_files,
+    get_spike_duration,
+    insert_metadata_header,
     missing_column_check,
+    parse_,
+    read,
     read_convert_headers,
-    convert_dtypes,
+    validate_and_convert,
 )
-from usb_logger_parser.storage_units import (
-    StorageCondition,
-    Fridge,
-    create_storage_condition_manually,
-)
-from usb_logger_parser.analytical_service import AnalyticalService
 from usb_logger_parser.reporting_service import (
     ReportingService,
     XLSXGraph,
     XLSXSummary,
+)
+from usb_logger_parser.storage_units import (
+    Fridge,
+    StorageCondition,
+    create_storage_condition_manually,
 )
 
 logger = logging.getLogger(__name__)

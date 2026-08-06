@@ -1,9 +1,10 @@
 from dataclasses import dataclass
+
 from usb_logger_parser.helper_functions import (
-    read,
+    get_ave_data_coll_freq,
     get_average_temp,
     get_user_confirmation,
-    get_ave_data_coll_freq,
+    read,
 )
 
 
@@ -89,7 +90,7 @@ def create_storage_condition_manually(
         user_input = input(
             "Storage condition not clear. Please clarify storage condition for your temperature trace '{file_basename}' for logger {logger_id} here (FG/FZ/CS/25C/50C):"
         )
-        if user_input in storage_condit_dict.keys():
+        if user_input in storage_condit_dict:
             storage_condition = storage_condit_dict[user_input]
             return storage_condition
         else:

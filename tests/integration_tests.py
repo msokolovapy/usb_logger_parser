@@ -2,12 +2,12 @@ import unittest
 from datetime import datetime
 from unittest.mock import patch
 
-from usb_logger_parser.storage_units import StorageCondition, Freezer, Fridge
 from usb_logger_parser.analytical_service import AnalyticalService
+from usb_logger_parser.helper_functions import get_files
 from usb_logger_parser.reporting_service import (
     ReportingService,
 )
-from usb_logger_parser.helper_functions import get_files
+from usb_logger_parser.storage_units import Freezer, Fridge, StorageCondition
 
 
 class TestColdStorageUnit(unittest.TestCase):

@@ -1,8 +1,9 @@
-from xlsxwriter import Workbook
-from pathlib import Path
 import logging
-import pandas as pd
-from datetime import datetime, date
+from datetime import date, datetime
+from pathlib import Path
+
+from xlsxwriter import Workbook
+
 from usb_logger_parser.helper_functions import (
     data_collection_frequency_check,
     extract_to_list,
@@ -122,8 +123,8 @@ class XLSXGraph:
 
     def insert_data(self):
         if not self.data_to_graph:
-            logger.warning(f"No data for visualisation was provided")
-            raise ValueError(f"No data for visualisation was provided")
+            logger.warning("No data for visualisation was provided")
+            raise ValueError("No data for visualisation was provided")
 
         for data in self.data_to_graph:
             for unit, prepared_data in data.items():

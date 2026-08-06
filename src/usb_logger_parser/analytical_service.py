@@ -1,14 +1,14 @@
-import pandas as pd
-import numpy as np
 import math
 from datetime import timedelta
+
+import numpy as np
+import pandas as pd
+
 from usb_logger_parser.helper_functions import (
-    parse_,
+    extract_to_list,
     get_extreme_date_time,
     get_extreme_temp,
     get_spike_duration,
-    convert_timestamps,
-    extract_to_list,
     insert_metadata_header,
 )
 

@@ -6,3 +6,4 @@ dist/
 .secrets
 *.log
 output/
+.ruff_cache
