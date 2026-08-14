@@ -40,12 +40,12 @@ target-version = ["py312"]
 
 [tool.ruff]
 target-version = "py312"
-line-length = 88  # match Black's default
+line-length = 88 
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM"]
 ignore = [
-    "E501",   # line length — Black handles wrapping, don't double-enforce
+    "E501",  
 ]
 
 [tool.ruff.lint.per-file-ignores]
