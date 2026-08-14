@@ -71,7 +71,7 @@ def validate_and_convert(file):
         return df
     except (ValueError, KeyError) as e:
         raise e from None  # re-raising independently so that either error is not caught by 'except Exception as e'
-    except Exception as e:
+    except Exception as e: 
         logger.error(f"Unexpected error ({e}) occured when trying to load '{file}'")
         raise e from None
 
@@ -159,7 +159,7 @@ def get_files(package, folder):
             )
     except ValueError:
         raise
-    except Exception:
+    except Exception: # noqa: BLE001 - deliberate catch-all, logged and re-raised
         logger.error(f"Unexpected error when trying to access {package}.{folder}")
         raise ValueError(f"Unexpected error when trying to access {package}.{folder}")
     return found_files
@@ -176,7 +176,7 @@ def missing_column_check(columns, required_cols):
     except AttributeError:
         logger.warning("Failed to convert column names to lower-case")
         raise AttributeError("Failed to convert column names to lower-case")
-    except Exception:
+    except Exception: # noqa: BLE001 - deliberate catch-all, logged and re-raised
         logger.warning(
             "Unknown error when trying to convert column names to lower-case"
         )
@@ -202,9 +202,9 @@ def read_convert_headers(header):
             raise AttributeError(
                 f"Failed to convert header '{header}' to an expected header"
             )
-        except Exception:
+        except Exception: # noqa: BLE001 - deliberate catch-all, logged and re-raised
             logger.warning("Unexpected error occured when trying to convert header")
-            raise Exception("Unexpected error occured when trying to convert header")
+            raise RuntimeError("Unexpected error occured when trying to convert header")
     return header
 
 

@@ -1,6 +1,7 @@
 import datetime
 import logging
 import unittest
+from datetime import timezone
 from pathlib import Path
 from unittest.mock import MagicMock, Mock, patch
 
@@ -155,7 +156,7 @@ class TestColdChainUnit(unittest.TestCase):
                 mock_get_ave_temp.return_value = 5.0
                 mock_user_confirmation.side_effect = ["wrong entry", "FG"]
 
-                unit = StorageCondition.create_from_(file)
+                StorageCondition.create_from_(file)
                 mock_read.assert_called_with(file)
                 mock_get_ave_temp.assert_called_with("df_temp_data")
                 mock_ave_data_coll_freq.assert_called_with("df_temp_data")
@@ -164,7 +165,7 @@ class TestColdChainUnit(unittest.TestCase):
             with self.subTest():
                 mock_get_ave_temp.return_value = 999.9
 
-                unit = StorageCondition.create_from_(file)
+                StorageCondition.create_from_(file)
                 mock_read.assert_called_with(file)
                 mock_get_ave_temp.assert_called_with("df_temp_data")
                 mock_ave_data_coll_freq.assert_called_with("df_temp_data")
@@ -175,13 +176,13 @@ class TestColdChainUnit(unittest.TestCase):
             patch("usb_logger_parser.storage_units.read") as mock_read,
             patch(
                 "usb_logger_parser.storage_units.get_ave_data_coll_freq"
-            ) as mock_ave_data_coll_freq,
+            ),
             patch(
                 "usb_logger_parser.storage_units.get_average_temp"
             ) as mock_get_ave_temp,
             patch(
                 "usb_logger_parser.storage_units.get_user_confirmation"
-            ) as mock_user_confirmation,
+            ),
         ):
 
             mock_read.return_value = (
@@ -274,37 +275,35 @@ class TestHelperFunctions(unittest.TestCase):
                         validate_and_convert("dummy.txt")
                 self.assertIn(error_message, str(context.exception))
 
-        with self.subTest("any other random exception"):
-            with patch(
+        with self.subTest("any other random exception"), patch(
+            "usb_logger_parser.helper_functions.pd.read_csv"
+        ) as mock_read_csv:
+            mock_read_csv.side_effect = pd.errors.ParserError
+            with self.assertRaises(pd.errors.ParserError):
+                validate_and_convert("file that raises an exception.txt")
+
+        with (
+            self.subTest("validate_and_convert successful"), patch(
                 "usb_logger_parser.helper_functions.pd.read_csv"
-            ) as mock_read_csv:
-                mock_read_csv.side_effect = pd.errors.ParserError
-                with self.assertRaises(pd.errors.ParserError):
-                    validate_and_convert("file that raises an exception.txt")
+            ) as mock_read_csv,
+            patch(
+                "usb_logger_parser.helper_functions.missing_column_check"
+            ) as mock_missing_column_check,
+            patch(
+                "usb_logger_parser.helper_functions.convert_dtypes"
+            ) as mock_convert_dtypes,
+        ):
+            mock_read_csv.return_value = pd.DataFrame(
+                {"Time": [1, 2, 3], "Celsius": [1, 2, 3]}
+            )
+            mock_missing_column_check.return_value = []
+            mock_convert_dtypes.return_value = "df"
+            result = validate_and_convert("dummy.txt")
 
-        with self.subTest("validate_and_convert successful"):
-            with (
-                patch(
-                    "usb_logger_parser.helper_functions.pd.read_csv"
-                ) as mock_read_csv,
-                patch(
-                    "usb_logger_parser.helper_functions.missing_column_check"
-                ) as mock_missing_column_check,
-                patch(
-                    "usb_logger_parser.helper_functions.convert_dtypes"
-                ) as mock_convert_dtypes,
-            ):
-                mock_read_csv.return_value = pd.DataFrame(
-                    {"Time": [1, 2, 3], "Celsius": [1, 2, 3]}
-                )
-                mock_missing_column_check.return_value = []
-                mock_convert_dtypes.return_value = "df"
-                result = validate_and_convert("dummy.txt")
-
-                mock_read_csv.assert_called_with("dummy.txt", encoding="latin-1")
-                mock_missing_column_check.assert_called()
-                mock_convert_dtypes.assert_called()
-                self.assertEqual(result, "df")
+            mock_read_csv.assert_called_with("dummy.txt", encoding="latin-1")
+            mock_missing_column_check.assert_called()
+            mock_convert_dtypes.assert_called()
+            self.assertEqual(result, "df")
 
     def test_get_average_temp(self):
         df = pd.DataFrame({"celsius": [-25.0, -26.0, -24.0, -23.0]})
@@ -1406,7 +1405,7 @@ class TestReportingService(unittest.TestCase):
             mock_prepare_data.return_value = sample_data
             storage_units = [self.unit]
 
-            result = self.reporting_service.report_raw_data(storage_units)
+            self.reporting_service.report_raw_data(storage_units)
 
             mock_prepare_data.assert_called_with(self.unit)
             mock_insert_data.assert_called()
@@ -1458,7 +1457,7 @@ class TestReportingService(unittest.TestCase):
 class TestXLSXSummary(unittest.TestCase):
     def test_xlsx_summary_init(self):
         spikes_list = []
-        today = datetime.datetime.now().strftime("%Y-%m-%d")
+        today = datetime.datetime.now(timezone.utc).astimezone().strftime("%Y-%m-%d")
         output_path = None
         output_dir = Path("output")
 
@@ -1517,7 +1516,7 @@ class TestXLSXSummary(unittest.TestCase):
                 ),
             ),
         ]
-        today = datetime.datetime.now().strftime("%Y-%m-%d")
+        today = datetime.datetime.now(timezone.utc).astimezone().strftime("%Y-%m-%d")
         output_path = f"{today}_unittests_spikes_summary"
         output_dir = Path("output")
         xlsx_summary = XLSXSummary(sample_spikes_list, output_dir, output_path)
@@ -1547,7 +1546,7 @@ class TestXLSXGraph(unittest.TestCase):
                 "data_width": "data_width",
             }
         }
-        today = datetime.datetime.now().strftime("%Y-%m-%d")
+        today = datetime.datetime.now(timezone.utc).astimezone().strftime("%Y-%m-%d")
         output_path = None
         output_dir = Path("output")
         result = XLSXGraph(data, output_dir, output_path)
@@ -1583,7 +1582,6 @@ class TestXLSXGraph(unittest.TestCase):
                 }
             }
         ]
-        today = datetime.datetime.now().strftime("%Y-%m-%d")
         output_path = "unused_path"
         output_dir = Path("output")
         xlsxgraph = XLSXGraph(data, output_dir, output_path)
@@ -1619,7 +1617,7 @@ class TestXLSXGraph(unittest.TestCase):
                 }
             }
         ]
-        today = datetime.datetime.now().strftime("%Y-%m-%d")
+        today = datetime.datetime.now(timezone.utc).astimezone().strftime("%Y-%m-%d")
         output_path = f"{today}_unittests_graph"
         output_dir = Path("output")
         xlsxgraph = XLSXGraph(data, output_dir, output_path)
