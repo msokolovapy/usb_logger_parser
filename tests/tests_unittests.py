@@ -174,15 +174,11 @@ class TestColdChainUnit(unittest.TestCase):
     def test_create_cc_unit(self):
         with (
             patch("usb_logger_parser.storage_units.read") as mock_read,
-            patch(
-                "usb_logger_parser.storage_units.get_ave_data_coll_freq"
-            ),
+            patch("usb_logger_parser.storage_units.get_ave_data_coll_freq"),
             patch(
                 "usb_logger_parser.storage_units.get_average_temp"
             ) as mock_get_ave_temp,
-            patch(
-                "usb_logger_parser.storage_units.get_user_confirmation"
-            ),
+            patch("usb_logger_parser.storage_units.get_user_confirmation"),
         ):
 
             mock_read.return_value = (
@@ -275,17 +271,17 @@ class TestHelperFunctions(unittest.TestCase):
                         validate_and_convert("dummy.txt")
                 self.assertIn(error_message, str(context.exception))
 
-        with self.subTest("any other random exception"), patch(
-            "usb_logger_parser.helper_functions.pd.read_csv"
-        ) as mock_read_csv:
+        with (
+            self.subTest("any other random exception"),
+            patch("usb_logger_parser.helper_functions.pd.read_csv") as mock_read_csv,
+        ):
             mock_read_csv.side_effect = pd.errors.ParserError
             with self.assertRaises(pd.errors.ParserError):
                 validate_and_convert("file that raises an exception.txt")
 
         with (
-            self.subTest("validate_and_convert successful"), patch(
-                "usb_logger_parser.helper_functions.pd.read_csv"
-            ) as mock_read_csv,
+            self.subTest("validate_and_convert successful"),
+            patch("usb_logger_parser.helper_functions.pd.read_csv") as mock_read_csv,
             patch(
                 "usb_logger_parser.helper_functions.missing_column_check"
             ) as mock_missing_column_check,
