@@ -91,7 +91,7 @@ class AnalyticalService:
         return df
 
     def filter_by_last_spike(self, df):
-        df_last_spike_of_day = df[df["last_spike_of_day"] == True][
+        df_last_spike_of_day = df[df["last_spike_of_day"]][
             ["cumulat_spike_id", "date_time", "last_spike_of_day", "24hr_window_start"]
         ]
         return df_last_spike_of_day

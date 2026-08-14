@@ -1,5 +1,5 @@
 import unittest
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from unittest.mock import patch
 
 from usb_logger_parser.analytical_service import AnalyticalService
@@ -38,7 +38,7 @@ class TestColdStorageUnit(unittest.TestCase):
 
 class TestReportRawData(unittest.TestCase):
     def test_report_raw_data(self):
-        today = datetime.now(timezone.utc).astimezone().strftime("%Y-%m-%d")
+        today = datetime.now(UTC).astimezone().strftime("%Y-%m-%d")
         file_list = get_files("usb_logger_parser", "resources")
         reporting_service = ReportingService(f"{today}_integration_tests_graph")
         with (
@@ -58,7 +58,7 @@ class TestReportRawData(unittest.TestCase):
 
 class TestReportSpikes(unittest.TestCase):
     def test_report_spikes(self):
-        today = datetime.now(timezone.utc).astimezone().strftime("%Y-%m-%d")
+        today = datetime.now(UTC).astimezone().strftime("%Y-%m-%d")
         analytical_service = AnalyticalService()
         reporting_service = ReportingService(
             f"{today}_integration_tests_spikes_summary"

@@ -159,9 +159,11 @@ def get_files(package, folder):
             )
     except ValueError:
         raise
-    except Exception:  # noqa: BLE001 - deliberate catch-all, logged and re-raised
+    except Exception as e:  # noqa: BLE001 - deliberate catch-all, logged and re-raised
         logger.error(f"Unexpected error when trying to access {package}.{folder}")
-        raise ValueError(f"Unexpected error when trying to access {package}.{folder}")
+        raise ValueError(
+            f"Unexpected error when trying to access {package}.{folder}"
+        ) from e
     return found_files
 
 
@@ -173,16 +175,16 @@ def missing_column_check(columns, required_cols):
     try:
         required_cols_lower = [req_col.lower() for req_col in required_cols]
         columns_lower = [col.lower() for col in columns]
-    except AttributeError:
+    except AttributeError as e:
         logger.warning("Failed to convert column names to lower-case")
-        raise AttributeError("Failed to convert column names to lower-case")
-    except Exception:  # noqa: BLE001 - deliberate catch-all, logged and re-raised
+        raise AttributeError("Failed to convert column names to lower-case") from e
+    except Exception as e:  # noqa: BLE001 - deliberate catch-all, logged and re-raised
         logger.warning(
             "Unknown error when trying to convert column names to lower-case"
         )
         raise AttributeError(
             "Unknown error when trying to convert column names to lower-case"
-        )
+        ) from e
     for req in required_cols_lower:
         if req not in "".join(
             columns_lower
@@ -197,14 +199,18 @@ def read_convert_headers(header):
         try:
             if hd.lower() in header.lower():
                 return hd
-        except AttributeError:
+        except AttributeError as e:
             logger.warning(f"Failed to convert header '{header}' to an expected header")
             raise AttributeError(
                 f"Failed to convert header '{header}' to an expected header"
-            )
-        except Exception:  # noqa: BLE001 - deliberate catch-all, logged and re-raised
+            ) from e
+        except (
+            Exception
+        ) as e:  # noqa: BLE001 - deliberate catch-all, logged and re-raised
             logger.warning("Unexpected error occured when trying to convert header")
-            raise RuntimeError("Unexpected error occured when trying to convert header")
+            raise RuntimeError(
+                "Unexpected error occured when trying to convert header"
+            ) from e
     return header
 
 
@@ -223,11 +229,11 @@ def convert_dtypes(df):
                     df[col] = conversion_type(df[col])
                 else:
                     df[col] = df[col].astype(conversion_type)
-            except ValueError:
+            except ValueError as e:
                 logger.warning(
                     f"Failed to convert column '{col}' using {conversion_type}"
                 )
                 raise ValueError(
                     f"Failed to convert column '{col}' using {conversion_type}"
-                )
+                ) from e
     return df

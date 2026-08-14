@@ -1,5 +1,5 @@
 import logging
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from pathlib import Path
 
 from xlsxwriter import Workbook
@@ -76,7 +76,7 @@ class XLSXSummary:
         )  # same as above
 
     def get_file_name(self):
-        formatted_today = datetime.now(timezone.utc).astimezone().strftime("%Y-%m-%d")
+        formatted_today = datetime.now(UTC).astimezone().strftime("%Y-%m-%d")
         return f"{formatted_today}_spikes_summary"
 
     def insert_data(self):
@@ -118,7 +118,7 @@ class XLSXGraph:
         )  # essential for xlxswriter to save dates as native Excel format
 
     def get_file_name(self):
-        formatted_today = datetime.now(timezone.utc).astimezone().strftime("%Y-%m-%d")
+        formatted_today = datetime.now(UTC).astimezone().strftime("%Y-%m-%d")
         return f"{formatted_today}_usb_loggers_graph"
 
     def insert_data(self):

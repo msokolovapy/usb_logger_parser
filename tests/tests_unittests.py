@@ -1,7 +1,6 @@
 import datetime
 import logging
 import unittest
-from datetime import timezone
 from pathlib import Path
 from unittest.mock import MagicMock, Mock, patch
 
@@ -423,7 +422,7 @@ class TestHelperFunctions(unittest.TestCase):
             (10.0, "ACPL03"),
             (20.3, "ACPL04"),
         ]
-        for mock_unit, attributes in zip(units_fail, fail_dict):
+        for mock_unit, attributes in zip(units_fail, fail_dict, strict=True):
             ave_data_coll_freq, logger_id = attributes
             mock_unit.logger.ave_data_coll_freq = ave_data_coll_freq
             mock_unit.logger.id = logger_id
@@ -956,7 +955,7 @@ class TestAnalyticalService(unittest.TestCase):
         )
 
         df_filtered = self.analytical_service.filter_by_status(sample_df)
-        self.assertTrue((df_filtered["status"] != None).all())
+        self.assertTrue(df_filtered["status"].notna().all())
 
     def test_add_last_spike_check(self):
         sample_df = pd.DataFrame(
@@ -1073,7 +1072,7 @@ class TestAnalyticalService(unittest.TestCase):
             "24hr_window_start",
         ]
 
-        self.assertTrue((df_grouped["last_spike_of_day"] == True).all())
+        self.assertTrue(df_grouped["last_spike_of_day"].all())
         self.assertEqual(list(df_grouped.columns), expected_columns)
 
     def test_spike_duration_in_24hr_window(self):
@@ -1453,7 +1452,7 @@ class TestReportingService(unittest.TestCase):
 class TestXLSXSummary(unittest.TestCase):
     def test_xlsx_summary_init(self):
         spikes_list = []
-        today = datetime.datetime.now(timezone.utc).astimezone().strftime("%Y-%m-%d")
+        today = datetime.datetime.now(datetime.UTC).astimezone().strftime("%Y-%m-%d")
         output_path = None
         output_dir = Path("output")
 
@@ -1512,7 +1511,7 @@ class TestXLSXSummary(unittest.TestCase):
                 ),
             ),
         ]
-        today = datetime.datetime.now(timezone.utc).astimezone().strftime("%Y-%m-%d")
+        today = datetime.datetime.now(datetime.UTC).astimezone().strftime("%Y-%m-%d")
         output_path = f"{today}_unittests_spikes_summary"
         output_dir = Path("output")
         xlsx_summary = XLSXSummary(sample_spikes_list, output_dir, output_path)
@@ -1542,7 +1541,7 @@ class TestXLSXGraph(unittest.TestCase):
                 "data_width": "data_width",
             }
         }
-        today = datetime.datetime.now(timezone.utc).astimezone().strftime("%Y-%m-%d")
+        today = datetime.datetime.now(datetime.UTC).astimezone().strftime("%Y-%m-%d")
         output_path = None
         output_dir = Path("output")
         result = XLSXGraph(data, output_dir, output_path)
@@ -1613,7 +1612,7 @@ class TestXLSXGraph(unittest.TestCase):
                 }
             }
         ]
-        today = datetime.datetime.now(timezone.utc).astimezone().strftime("%Y-%m-%d")
+        today = datetime.datetime.now(datetime.UTC).astimezone().strftime("%Y-%m-%d")
         output_path = f"{today}_unittests_graph"
         output_dir = Path("output")
         xlsxgraph = XLSXGraph(data, output_dir, output_path)
