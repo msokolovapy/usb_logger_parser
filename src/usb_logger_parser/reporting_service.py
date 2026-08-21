@@ -1,3 +1,16 @@
+"""
+reporting_service.py
+
+Prepares .xlsx documents to display raw temperature data and/or spike summary
+
+Workflow:
+1.	Ingest raw data and/or spike summary
+2.	Prepares .xlsx file with the following information:
+a.	displays all raw data (with all relevant information about the cold storage unit/logger in data header)
+b.	displays an overlay graph (temperature reading vs row number)
+3.	Prepares .xlsx file where spike summary is displayed in tabular form (with all relevant information about the cold storage unit/logger in data header)
+"""
+
 import logging
 from datetime import UTC, date, datetime
 from pathlib import Path

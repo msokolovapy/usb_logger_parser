@@ -1,3 +1,29 @@
+"""
+analytical_service.py
+
+Detects, quantifies, and classifies temperature spikes from logger data.
+
+Workflow:
+1.	Ingest cleaned temperature readings
+2.	Use ‘status’ column to categorize temperature readings into ‘too_high’ / ‘too_low’ depending on the temperature limits specified in Limits class
+3.	Add cumulative spike_id to temperature readings based on the change between ‘status’ field – when status changes, next cumulative spike id is initiated.
+4.	Extract information on total duration of spikes over 24hr period by:
+a.	Calculating time difference in minutes between individual temperature readings
+b.	Filtering  temperature readings that are in ‘too_high’ and ‘too_low’ categories
+c.	Including new field ‘last_spike_of_day’ based on the difference between dates – when date changes, previous reading is the last spike of the day.
+d.	Adding 24hr window to the last spike of the day
+e.	Filtering last_spike_of_day column by True values
+f.	Using original data and information from (e) to sum time difference in minutes from (a) to determine the total duration of all spikes over the 24hr period using last spike of day as a starting point.
+5.	Extracts information about temperature excursions (spikes) by:
+a.	Grouping temperature readings into ‘too_high’ and ‘too_low’ groups and determining group extremes such as max/min temperature, max/min datetime, max/min date and individual spike group duration in mins
+6.	Merge  (4) and (5) to include total spike duration over the period of 24hr into the excursions dataframe.
+7.	Renumber spikes to start from 1 and restart spike count on the next day
+8.	Check spikes against single and total spike duration limits provided and mark spikes as Fail or Pass.
+9.	For spikes in Fail category, calculate Mean Kinetic Temperature over 24hr period using failed spike as a starting point for ± 12hr period calculation
+10.	Prepare spike summary to feed into Reporting Service.
+
+"""
+
 import math
 from datetime import timedelta
 
@@ -37,7 +63,7 @@ class AnalyticalService:
         return spike_dict_list
 
     def add_status_column(self, df, low_alarm, high_alarm):
-        """finds spikes and adds 'status' column, which will be used to filter spike max (if too_high) or min (if too_low) temperature"""
+        """finds spikes and adds 'status' column, which will be used to filter spike max (if 'too_high') or min (if 'too_low') temperature"""
         df.loc[df["celsius"] > high_alarm, "status"] = "too_high"
         df.loc[df["celsius"] < low_alarm, "status"] = "too_low"
         return df
@@ -48,8 +74,8 @@ class AnalyticalService:
         return df
 
     def add_gap_mins(self, df):
-        """groups spike info and finds delta datetime between readings within the group.
-        Will be used to calculate total_spike_duration"""
+        """groups spike info and finds delta datetime between individual readings within the group,
+        which will be used to calculate total_spike_duration"""
         df["reading_gap_mins"] = (
             df.groupby("cumulat_spike_id")["date_time"].diff().dt.total_seconds() / 60
         )
